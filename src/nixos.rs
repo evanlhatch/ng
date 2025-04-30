@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use color_eyre::eyre::{bail, Context};
 use color_eyre::eyre::{eyre, Result};
 use tracing::{debug, info, warn};
+use walkdir::WalkDir;
+use rayon::prelude::*;
 
 use crate::commands;
 use crate::commands::Command;
@@ -60,6 +62,30 @@ impl OsRebuildArgs {
             }
             true
         };
+
+        // Add pre-flight checks
+        let run_preflight = !self.common.common.no_preflight;
+        if run_preflight {
+            // Parse Check
+            let pb = crate::progress::start_spinner("[🧩 Parse] Checking syntax...");
+            match self.run_parallel_parse_check(verbose_count) {
+                Ok(_) => {
+                    crate::progress::finish_spinner_success(&pb, "[✅ Parse] OK.");
+                },
+                Err(details) => {
+                    crate::progress::finish_spinner_fail(&pb);
+                    crate::error_handler::report_failure(
+                        "Parse Check",
+                        "Syntax errors found",
+                        Some(details),
+                        vec!["Fix syntax errors.".into()]
+                    );
+                    bail!("Parse check failed");
+                }
+            }
+        } else {
+            info!("[⏭️ Parse] Check skipped.");
+        }
 
         if self.update_args.update {
             update(&self.common.installable, self.update_args.update_input)?;
@@ -184,6 +210,62 @@ impl OsRebuildArgs {
         drop(out_path);
 
         Ok(())
+    }
+
+    // Helper method to run parallel parse check on all .nix files
+    fn run_parallel_parse_check(&self, verbose_count: u8) -> Result<(), String> {
+        info!("Running parallel syntax check on .nix files...");
+        
+        // Find .nix files
+        let nix_files: Vec<PathBuf> = WalkDir::new(".")
+            .follow_links(true)
+            .into_iter()
+            .filter_entry(|e| !e.file_name().to_str().map_or(false, |s| s.starts_with('.')))
+            .filter_map(|entry| {
+                entry.ok().filter(|e| {
+                    e.file_type().is_file() &&
+                    e.path().extension().map_or(false, |ext| ext == "nix")
+                }).map(|e| e.path().to_owned())
+            })
+            .collect();
+            
+        if nix_files.is_empty() {
+            info!("No .nix files found to check.");
+            return Ok(());
+        }
+        
+        debug!("Found {} .nix files to check", nix_files.len());
+        
+        // Use rayon to run nix-instantiate in parallel
+        let parse_errors: Vec<(PathBuf, String)> = nix_files.par_iter()
+            .filter_map(|path| {
+                let mut cmd = std::process::Command::new("nix-instantiate");
+                cmd.args(["--parse", path.to_str().unwrap()]);
+                crate::util::add_verbosity_flags(&mut cmd, verbose_count);
+                
+                match cmd.output() {
+                    Ok(output) => {
+                        if !output.status.success() {
+                            let error = String::from_utf8_lossy(&output.stderr).to_string();
+                            Some((path.clone(), error))
+                        } else {
+                            None
+                        }
+                    },
+                    Err(e) => Some((path.clone(), format!("Failed to run nix-instantiate: {}", e)))
+                }
+            })
+            .collect();
+            
+        if parse_errors.is_empty() {
+            Ok(())
+        } else {
+            let mut combined_error = format!("Found {} file(s) with syntax errors:\n", parse_errors.len());
+            for (path, error) in parse_errors {
+                combined_error.push_str(&format!("\nError in {}: \n{}\n", path.display(), error));
+            }
+            Err(combined_error)
+        }
     }
 }
 
