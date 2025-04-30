@@ -33,7 +33,7 @@ type GenerationsTagged = BTreeMap<Generation, ToBeRemoved>;
 type ProfilesTagged = HashMap<PathBuf, GenerationsTagged>;
 
 impl interface::CleanMode {
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self, verbose_count: u8) -> Result<()> {
         let mut profiles = Vec::new();
         let mut gcroots_tagged: HashMap<PathBuf, ToBeRemoved> = HashMap::new();
         let now = SystemTime::now();

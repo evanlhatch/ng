@@ -1,17 +1,32 @@
+mod check_git;
 mod clean;
 mod commands;
 mod completion;
 mod darwin;
+mod error_handler;
 mod generations;
 mod home;
 mod installable;
 mod interface;
 mod json;
+mod lint;
 mod logging;
 mod nixos;
+mod progress;
 mod search;
 mod update;
 mod util;
+
+#[cfg(test)]
+mod error_handler_test;
+#[cfg(test)]
+mod lint_test;
+#[cfg(test)]
+mod check_git_test;
+#[cfg(test)]
+mod progress_test;
+#[cfg(test)]
+mod util_test;
 
 use color_eyre::Result;
 use tracing::debug;
@@ -38,7 +53,9 @@ fn main() -> Result<()> {
     }
 
     let args = <crate::interface::Main as clap::Parser>::parse();
-    crate::logging::setup_logging(args.verbose)?;
+    let verbose_count = args.verbose; // Extract verbosity count
+    
+    crate::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
     tracing::debug!("{args:#?}");
     tracing::debug!(%NH_VERSION, ?NH_REV);
 
@@ -48,7 +65,7 @@ fn main() -> Result<()> {
         );
     }
 
-    args.command.run()
+    args.command.run(verbose_count) // Pass the count to run
 }
 
 fn self_elevate() -> ! {

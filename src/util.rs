@@ -102,3 +102,125 @@ pub fn get_hostname() -> Result<String> {
         Ok(name.to_string())
     }
 }
+
+/// Adds verbosity flags to a command based on the verbosity level.
+///
+/// This function adds `-v` flags to the command for each level of verbosity.
+/// The maximum number of flags is capped at 7 to prevent excessive verbosity.
+///
+/// # Arguments
+///
+/// * `cmd` - A mutable reference to a Command to add flags to.
+/// * `verbosity_level` - The verbosity level (number of `-v` flags to add).
+///
+/// # Example
+///
+/// ```
+/// let mut cmd = Command::new("nix");
+/// add_verbosity_flags(&mut cmd, 3);
+/// // cmd now has args: ["-v", "-v", "-v"]
+/// ```
+pub fn add_verbosity_flags(cmd: &mut Command, verbosity_level: u8) {
+    let effective_level = std::cmp::min(verbosity_level, 7); // Cap at 7 to be reasonable
+    for _ in 0..effective_level {
+        cmd.arg("-v");
+    }
+}
+
+/// Runs a command and captures its output.
+///
+/// This function executes a command and captures its stdout and stderr.
+/// It returns an error if the command fails to execute or returns a non-zero status.
+///
+/// # Arguments
+///
+/// * `command` - A mutable reference to a Command to execute.
+///
+/// # Returns
+///
+/// * `Result<std::process::Output>` - The command's output or an error.
+pub fn run_cmd(command: &mut Command) -> Result<std::process::Output> {
+    use color_eyre::eyre::WrapErr;
+    use tracing::{debug, warn};
+    
+    debug!("Executing command: {:?}", command);
+    
+    let output = command
+        .output()
+        .wrap_err_with(|| format!("Failed to execute command: {:?}", command))?;
+    
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        
+        warn!(
+            "Command failed: {:?} - Exit Code: {:?}",
+            command,
+            output.status.code()
+        );
+        debug!("Stderr: {}", stderr);
+        debug!("Stdout: {}", stdout);
+        
+        return Err(color_eyre::eyre::eyre!(
+            "Command exited with non-zero status: {:?}",
+            output.status.code()
+        ));
+    }
+    
+    Ok(output)
+}
+
+/// Runs a command with inherited stdio.
+///
+/// This function executes a command with stdin, stdout, and stderr inherited from the parent process.
+/// It returns an error if the command fails to execute or returns a non-zero status.
+///
+/// # Arguments
+///
+/// * `command` - A mutable reference to a Command to execute.
+///
+/// # Returns
+///
+/// * `Result<std::process::ExitStatus>` - The command's exit status or an error.
+pub fn run_cmd_inherit_stdio(command: &mut Command) -> Result<std::process::ExitStatus> {
+    use color_eyre::eyre::WrapErr;
+    use std::process::Stdio;
+    use tracing::{debug, warn};
+    
+    debug!("Executing command with inherited stdio: {:?}", command);
+    
+    let status = command
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .wrap_err_with(|| {
+            format!("Failed to execute command with inherited stdio: {:?}", command)
+        })?;
+    
+    if !status.success() {
+        warn!(
+            "Command failed: {:?} - Exit Code: {:?}",
+            command,
+            status.code()
+        );
+        
+        return Err(color_eyre::eyre::eyre!(
+            "Command exited with non-zero status: {:?}",
+            status.code()
+        ));
+    }
+    
+    Ok(status)
+}
+
+/// Checks if stdout is connected to a terminal.
+///
+/// This function uses the atty crate to determine if stdout is a TTY.
+///
+/// # Returns
+///
+/// * `bool` - True if stdout is a TTY, false otherwise.
+pub fn is_stdout_tty() -> bool {
+    atty::is(atty::Stream::Stdout)
+}

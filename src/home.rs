@@ -13,17 +13,17 @@ use crate::update::update;
 use crate::util::get_hostname;
 
 impl interface::HomeArgs {
-    pub fn run(self) -> Result<()> {
+    pub fn run(self, verbose_count: u8) -> Result<()> {
         use HomeRebuildVariant::*;
         match self.subcommand {
-            HomeSubcommand::Switch(args) => args.rebuild(Switch),
+            HomeSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
             HomeSubcommand::Build(args) => {
-                if args.common.ask || args.common.dry {
+                if args.common.common.ask || args.common.common.dry {
                     warn!("`--ask` and `--dry` have no effect for `nh home build`");
                 }
-                args.rebuild(Build)
+                args.rebuild(Build, verbose_count)
             }
-            HomeSubcommand::Repl(args) => args.run(),
+            HomeSubcommand::Repl(args) => args.run(verbose_count),
         }
     }
 }
@@ -35,14 +35,14 @@ enum HomeRebuildVariant {
 }
 
 impl HomeRebuildArgs {
-    fn rebuild(self, variant: HomeRebuildVariant) -> Result<()> {
+    fn rebuild(self, variant: HomeRebuildVariant, verbose_count: u8) -> Result<()> {
         use HomeRebuildVariant::*;
 
         if self.update_args.update {
             update(&self.common.installable, self.update_args.update_input)?;
         }
 
-        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.out_link {
+        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
             None => Box::new({
                 let dir = tempfile::Builder::new().prefix("nh-os").tempdir()?;
@@ -78,7 +78,7 @@ impl HomeRebuildArgs {
             .extra_arg(out_path.get_path())
             .extra_args(&self.extra_args)
             .message("Building Home-Manager configuration")
-            .nom(!self.common.no_nom)
+            .nom(!self.common.common.no_nom)
             .run()?;
 
         let prev_generation: Option<PathBuf> = [
@@ -121,14 +121,14 @@ impl HomeRebuildArgs {
                 .run()?;
         }
 
-        if self.common.dry || matches!(variant, Build) {
-            if self.common.ask {
+        if self.common.common.dry || matches!(variant, Build) {
+            if self.common.common.ask {
                 warn!("--ask has no effect as dry run was requested");
             }
             return Ok(());
         }
 
-        if self.common.ask {
+        if self.common.common.ask {
             info!("Apply the config?");
             let confirmation = dialoguer::Confirm::new().default(false).interact()?;
 
@@ -268,7 +268,7 @@ where
 }
 
 impl HomeReplArgs {
-    fn run(self) -> Result<()> {
+    fn run(self, verbose_count: u8) -> Result<()> {
         // Use NH_HOME_FLAKE if available, otherwise use the provided installable
         let installable = if let Ok(home_flake) = env::var("NH_HOME_FLAKE") {
             debug!("Using NH_HOME_FLAKE: {}", home_flake);

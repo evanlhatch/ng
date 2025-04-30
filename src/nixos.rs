@@ -21,19 +21,19 @@ const CURRENT_PROFILE: &str = "/run/current-system";
 const SPEC_LOCATION: &str = "/etc/specialisation";
 
 impl interface::OsArgs {
-    pub fn run(self) -> Result<()> {
+    pub fn run(self, verbose_count: u8) -> Result<()> {
         use OsRebuildVariant::*;
         match self.subcommand {
-            OsSubcommand::Boot(args) => args.rebuild(Boot),
-            OsSubcommand::Test(args) => args.rebuild(Test),
-            OsSubcommand::Switch(args) => args.rebuild(Switch),
+            OsSubcommand::Boot(args) => args.rebuild(Boot, verbose_count),
+            OsSubcommand::Test(args) => args.rebuild(Test, verbose_count),
+            OsSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
             OsSubcommand::Build(args) => {
-                if args.common.ask || args.common.dry {
+                if args.common.common.ask || args.common.common.dry {
                     warn!("`--ask` and `--dry` have no effect for `nh os build`");
                 }
-                args.rebuild(Build)
+                args.rebuild(Build, verbose_count)
             }
-            OsSubcommand::Repl(args) => args.run(),
+            OsSubcommand::Repl(args) => args.run(verbose_count),
             OsSubcommand::Info(args) => args.info(),
         }
     }
@@ -48,7 +48,7 @@ enum OsRebuildVariant {
 }
 
 impl OsRebuildArgs {
-    fn rebuild(self, variant: OsRebuildVariant) -> Result<()> {
+    fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
         use OsRebuildVariant::*;
 
         let elevate = if self.bypass_root_check {
@@ -67,7 +67,7 @@ impl OsRebuildArgs {
 
         let hostname = self.hostname.ok_or(()).or_else(|()| get_hostname())?;
 
-        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.out_link {
+        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
             None => Box::new({
                 let dir = tempfile::Builder::new().prefix("nh-os").tempdir()?;
@@ -103,7 +103,7 @@ impl OsRebuildArgs {
             .extra_arg(out_path.get_path())
             .extra_args(&self.extra_args)
             .message("Building NixOS configuration")
-            .nom(!self.common.no_nom)
+            .nom(!self.common.common.no_nom)
             .run()?;
 
         let current_specialisation = std::fs::read_to_string(SPEC_LOCATION).ok();
@@ -130,14 +130,14 @@ impl OsRebuildArgs {
             .message("Comparing changes")
             .run()?;
 
-        if self.common.dry || matches!(variant, Build) {
-            if self.common.ask {
+        if self.common.common.dry || matches!(variant, Build) {
+            if self.common.common.ask {
                 warn!("--ask has no effect as dry run was requested");
             }
             return Ok(());
         }
 
-        if self.common.ask {
+        if self.common.common.ask {
             info!("Apply the config?");
             let confirmation = dialoguer::Confirm::new().default(false).interact()?;
 
@@ -223,7 +223,7 @@ pub fn toplevel_for<S: AsRef<str>>(hostname: S, installable: Installable) -> Ins
 }
 
 impl OsReplArgs {
-    fn run(self) -> Result<()> {
+    fn run(self, verbose_count: u8) -> Result<()> {
         // Use NH_OS_FLAKE if available, otherwise use the provided installable
         let mut target_installable = if let Ok(os_flake) = env::var("NH_OS_FLAKE") {
             debug!("Using NH_OS_FLAKE: {}", os_flake);

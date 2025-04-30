@@ -54,7 +54,7 @@ struct JSONOutput {
 }
 
 impl SearchArgs {
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self, verbose_count: u8) -> Result<()> {
         trace!("args: {self:?}");
 
         if !supported_branch(&self.channel) {

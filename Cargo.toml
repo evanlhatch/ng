@@ -51,6 +51,12 @@ tracing-subscriber = { version = "0.3.18", features = [
     "std"
 ] }
 uzers = { version = "0.12.0", default-features = false }
+# New dependencies for nh enhancement (Phase 1.1)
+indicatif = { version = "0.17", features = ["improved_unicode"] }
+cli-table = "0.4"
+rayon = "1"
+lazy_static = "1.4"
+atty = "0.2"
 
 [target.'cfg(target_os="macos")'.dependencies]
 system-configuration = "0.6.1"

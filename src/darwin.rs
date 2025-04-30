@@ -16,17 +16,17 @@ const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
 const CURRENT_PROFILE: &str = "/run/current-system";
 
 impl DarwinArgs {
-    pub fn run(self) -> Result<()> {
+    pub fn run(self, verbose_count: u8) -> Result<()> {
         use DarwinRebuildVariant::*;
         match self.subcommand {
-            DarwinSubcommand::Switch(args) => args.rebuild(Switch),
+            DarwinSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
             DarwinSubcommand::Build(args) => {
-                if args.common.ask || args.common.dry {
+                if args.common.common.ask || args.common.common.dry {
                     warn!("`--ask` and `--dry` have no effect for `nh darwin build`");
                 }
-                args.rebuild(Build)
+                args.rebuild(Build, verbose_count)
             }
-            DarwinSubcommand::Repl(args) => args.run(),
+            DarwinSubcommand::Repl(args) => args.run(verbose_count),
         }
     }
 }
@@ -37,7 +37,7 @@ enum DarwinRebuildVariant {
 }
 
 impl DarwinRebuildArgs {
-    fn rebuild(self, variant: DarwinRebuildVariant) -> Result<()> {
+    fn rebuild(self, variant: DarwinRebuildVariant, verbose_count: u8) -> Result<()> {
         use DarwinRebuildVariant::*;
 
         if nix::unistd::Uid::effective().is_root() {
@@ -50,7 +50,7 @@ impl DarwinRebuildArgs {
 
         let hostname = self.hostname.ok_or(()).or_else(|()| get_hostname())?;
 
-        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.out_link {
+        let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
             None => Box::new({
                 let dir = tempfile::Builder::new().prefix("nh-os").tempdir()?;
@@ -98,7 +98,7 @@ impl DarwinRebuildArgs {
             .extra_arg(out_path.get_path())
             .extra_args(&self.extra_args)
             .message("Building Darwin configuration")
-            .nom(!self.common.no_nom)
+            .nom(!self.common.common.no_nom)
             .run()?;
 
         let target_profile = out_path.get_path().to_owned();
@@ -112,7 +112,7 @@ impl DarwinRebuildArgs {
             .message("Comparing changes")
             .run()?;
 
-        if self.common.ask && !self.common.dry && !matches!(variant, Build) {
+        if self.common.common.ask && !self.common.common.dry && !matches!(variant, Build) {
             info!("Apply the config?");
             let confirmation = dialoguer::Confirm::new().default(false).interact()?;
 
@@ -126,14 +126,14 @@ impl DarwinRebuildArgs {
                 .args(["build", "--no-link", "--profile", SYSTEM_PROFILE])
                 .arg(out_path.get_path())
                 .elevate(true)
-                .dry(self.common.dry)
+                .dry(self.common.common.dry)
                 .run()?;
 
             let switch_to_configuration = out_path.get_path().join("activate-user");
 
             Command::new(switch_to_configuration)
                 .message("Activating configuration for user")
-                .dry(self.common.dry)
+                .dry(self.common.common.dry)
                 .run()?;
 
             let switch_to_configuration = out_path.get_path().join("activate");
@@ -141,7 +141,7 @@ impl DarwinRebuildArgs {
             Command::new(switch_to_configuration)
                 .elevate(true)
                 .message("Activating configuration")
-                .dry(self.common.dry)
+                .dry(self.common.common.dry)
                 .run()?;
         }
 
@@ -154,7 +154,7 @@ impl DarwinRebuildArgs {
 }
 
 impl DarwinReplArgs {
-    fn run(self) -> Result<()> {
+    fn run(self, verbose_count: u8) -> Result<()> {
         // Use NH_DARWIN_FLAKE if available, otherwise use the provided installable
         let mut target_installable = if let Ok(darwin_flake) = env::var("NH_DARWIN_FLAKE") {
             debug!("Using NH_DARWIN_FLAKE: {}", darwin_flake);

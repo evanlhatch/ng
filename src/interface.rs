@@ -32,9 +32,9 @@ const fn make_style() -> Styles {
 )]
 /// Yet another nix helper
 pub struct Main {
-    #[arg(short, long, global = true)]
-    /// Show debug logs
-    pub verbose: bool,
+    #[arg(short, long, action = clap::ArgAction::Count, global = true)]
+    /// Increase verbosity (can be used multiple times)
+    pub verbose: u8,
 
     #[command(subcommand)]
     pub command: NHCommand,
@@ -53,22 +53,22 @@ pub enum NHCommand {
 }
 
 impl NHCommand {
-    pub fn run(self) -> Result<()> {
+    pub fn run(self, verbose_count: u8) -> Result<()> {
         match self {
             Self::Os(args) => {
                 std::env::set_var("NH_CURRENT_COMMAND", "os");
-                args.run()
+                args.run(verbose_count)
             }
-            Self::Search(args) => args.run(),
-            Self::Clean(proxy) => proxy.command.run(),
-            Self::Completions(args) => args.run(),
+            Self::Search(args) => args.run(verbose_count),
+            Self::Clean(proxy) => proxy.command.run(verbose_count),
+            Self::Completions(args) => args.run(verbose_count),
             Self::Home(args) => {
                 std::env::set_var("NH_CURRENT_COMMAND", "home");
-                args.run()
+                args.run(verbose_count)
             }
             Self::Darwin(args) => {
                 std::env::set_var("NH_CURRENT_COMMAND", "darwin");
-                args.run()
+                args.run(verbose_count)
             }
         }
     }
@@ -134,26 +134,52 @@ pub struct OsRebuildArgs {
     pub bypass_root_check: bool,
 }
 
+#[derive(Debug, Args, Clone)]
+pub struct CommonArgs {
+    /// Skip pre-flight checks (Git, Parse, Flake, Lint)
+    #[arg(long, global = true)]
+    pub no_preflight: bool,
+    
+    /// Abort on any lint warning/error (after attempting fixes)
+    #[arg(long, global = true)]
+    pub strict_lint: bool,
+    
+    /// Run deeper checks: Nix Eval
+    #[arg(long, global = true)]
+    pub medium: bool,
+    
+    /// Run deepest checks: Nix Eval and Dry Run Build (implies --medium)
+    #[arg(long, global = true)]
+    pub full: bool,
+    
+    /// Only print actions, without performing them
+    #[arg(long, short = 'n', global = true)]
+    pub dry: bool,
+    
+    /// Ask for confirmation before activating/committing changes
+    #[arg(long, short, global = true)]
+    pub ask: bool,
+    
+    /// Don't use nix-output-monitor for the build process
+    #[arg(long, global = true)]
+    pub no_nom: bool,
+    
+    /// Path to save the build result link
+    #[arg(long, short, global = true)]
+    pub out_link: Option<PathBuf>,
+    
+    /// Run cleanup after successful activation (removes old gens, runs GC)
+    #[arg(long, global = true)]
+    pub clean: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct CommonRebuildArgs {
-    /// Only print actions, without performing them
-    #[arg(long, short = 'n')]
-    pub dry: bool,
-
-    /// Ask for confirmation
-    #[arg(long, short)]
-    pub ask: bool,
+    #[command(flatten)]
+    pub common: CommonArgs,
 
     #[command(flatten)]
     pub installable: Installable,
-
-    /// Don't use nix-output-monitor for the build process
-    #[arg(long)]
-    pub no_nom: bool,
-
-    /// Path to save the result link, defaults to using a temporary directory
-    #[arg(long, short)]
-    pub out_link: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

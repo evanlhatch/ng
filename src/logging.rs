@@ -52,20 +52,28 @@ where
     }
 }
 
-pub(crate) fn setup_logging(verbose: bool) -> Result<()> {
+pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
     color_eyre::config::HookBuilder::default()
         .display_location_section(true)
         .panic_section("Please report the bug at https://github.com/viperML/nh/issues")
         .display_env_section(false)
         .install()?;
-
+    
+    let is_debug = verbose_level > 0;
+    let is_trace = verbose_level > 1;
+    
     let layer_debug = fmt::layer()
         .with_writer(std::io::stderr)
         .without_time()
         .compact()
         .with_line_number(true)
-        .with_filter(EnvFilter::from_env("NH_LOG").or(filter_fn(move |_| verbose)))
-        .with_filter(filter_fn(|meta| *meta.level() > Level::INFO));
+        .with_filter(
+            EnvFilter::from_env("NH_LOG").or(filter_fn(move |meta| {
+                let level = *meta.level();
+                (is_debug && level == Level::DEBUG) ||
+                (is_trace && level == Level::TRACE)
+            }))
+        );
 
     let layer_info = fmt::layer()
         .with_writer(std::io::stderr)
