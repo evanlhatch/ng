@@ -1,173 +1,87 @@
-<!-- markdownlint-disable no-inline-html -->
-<h1 align="center">nh</h1>
+# ng - Next Generation Nix Helper
 
-<!-- markdownlint-disable line-length -->
-<h6 align="center">Because the name "yet-another-<u>n</u>ix-<u>h</u>elper" was too long to type...</h1>
+A fork of [nh](https://github.com/viperML/nh) with enhanced pre-flight checks, error reporting, and progress indicators.
 
-## What does it do?
+## Features
 
-[nix-output-monitor]: https://github.com/maralorn/nix-output-monitor
-[nvd]: https://khumba.net/projects/nvd
+- **Improved Pre-flight Checks**:
+  - Git status check to warn about untracked .nix files
+  - Parallel syntax checking of .nix files
+  - Linting and formatting with auto-fix capabilities
 
-Nh is a modern helper utility that is a take at reimplementing some commands
-from the NixOS ecosystem. We aim to provide more features and better ergonomics
-than the existing commands.
+- **Better Error Reporting**:
+  - Detailed error messages with context
+  - Actionable recommendations
+  - Build logs for failed derivations
 
-We provide several subcommands, such as:
+- **Progress Indicators**:
+  - Spinners for long-running operations
+  - Clear success/failure indicators
+  - Structured output for complex data
 
-- `os`, which reimplements `nixos-rebuild`, with a tree of builds, diff and
-  confirmation.
-- `home`, which reimplements `home-manager`.
-- `darwin`, which reimplements `darwin-rebuild`
-- `search`, a super-fast package searching tool (powered by a ElasticSearch
-  client).
-- `clean`, my own take at cleaning GC roots from a NixOS system.
+- **Verbosity Levels**:
+  - Default: Essential information only
+  - `-v`: Adds debug information
+  - `-vv`: Adds trace information
 
-This wouldn't be possible without the programs that nh runs under the hood:
-
-- Tree of builds with [nix-output-monitor].
-- Visualization of the upgrade diff with [nvd].
-- And of course, all the [crates](./Cargo.toml) we depend on.
-
-<p align="center">
-  <img
-    alt="nh feature showcase"
-    src="./.github/screenshot.png"
-    width="800px"
-  >
-</p>
+- **Build Modes**:
+  - **Quick Mode** (default): Basic checks only
+  - **Medium Mode** (`--medium`): Adds evaluation check
+  - **Full Mode** (`--full`): Adds dry-run build
 
 ## Installation
 
-The latest, tagged version will is available in Nixpkgs as Nh stable. This
-repository provides the latest development version of Nh, which you can get from
-the flake outputs.
+```sh
+# From GitHub
+nix shell github:evanlhatch/ng
+
+# From local clone
+git clone https://github.com/evanlhatch/ng.git
+cd ng
+nix shell .
+```
+
+## Usage
 
 ```sh
-nix shell nixpkgs#nh # stable
-nix shell github:viperML/nh # dev
+# Basic usage
+ng os switch .
+
+# With enhanced checks
+ng os switch . --medium
+
+# With full checks
+ng os switch . --full
+
+# With verbosity
+ng os switch . -vv
 ```
 
-### NixOS
+## Commands
 
-We provide a NixOS module that integrates `nh clean` as a service. To enable it,
-set the following configuration:
+- `os`: NixOS rebuild functionality
+- `home`: Home-manager functionality
+- `darwin`: Nix-darwin functionality
+- `search`: Package search functionality
+- `clean`: Enhanced nix cleanup with garbage collection
 
-```nix
-{ config, pkgs, ... }:
-{
-  programs.nh = {
-    enable = true;
-    clean.enable = true;
-    clean.extraArgs = "--keep-since 4d --keep 3";
-    flake = "/home/user/my-nixos-config";
-  };
-}
+## Development
+
+```sh
+# Clone the repository
+git clone https://github.com/evanlhatch/ng.git
+cd ng
+
+# Enter development shell
+nix develop
+
+# Build the project
+cargo build
+
+# Run the project
+cargo run -- --help
 ```
 
-Nh supports both Flakes and classical NixOS configurations:
+## License
 
-- For flakes, the command is `nh os switch /path/to/flake`
-- For a classical configuration:
-  - `nh os switch -f '<nixpkgs/nixos>'`, or
-  - `nh os switch -f '<nixpkgs/nixos>' -- -I
-  nixos-config=/path/to/configuration.nix`
-    if using a different location than the default.
-
-You might want to check `nh os --help` for other values and the defaults from
-environment variables.
-
-### Enhanced Features
-
-Nh includes several enhanced features to improve the user experience:
-
-#### Pre-flight Checks
-
-Before building and activating configurations, nh performs several pre-flight checks:
-
-- **Git Status Check**: Warns about untracked .nix files that might not be included in the build
-- **Parse Check**: Validates syntax of .nix files to catch errors early
-- **Lint Check**: Runs formatters and linters on .nix files (when available)
-
-#### Build Modes
-
-Nh supports different build modes with increasing levels of validation:
-
-- **Quick Mode** (default): Basic checks only
-- **Medium Mode** (`--medium`): Adds evaluation check
-- **Full Mode** (`--full`): Adds dry-run build
-
-#### Improved Error Reporting
-
-Nh provides detailed error reports with:
-
-- Clear error messages with context
-- Syntax error highlighting
-- Actionable recommendations
-- Build logs for failed derivations
-
-#### Progress Indicators
-
-Nh shows progress for long-running operations:
-
-- Spinners for active processes
-- Clear success/failure indicators
-- Structured output for complex data
-
-#### Verbosity Levels
-
-Control the amount of output with multiple verbosity levels:
-
-- Default: Essential information only
-- `-v`: Adds debug information
-- `-vv`: Adds trace information
-
-#### Specialisations support
-
-Nh is capable of detecting which specialisation you are running, so it runs the
-proper activation script. To do so, you need to give Nh some information of the
-spec that is currently running by writing its name to `/etc/specialisation`. The
-config would look like this:
-
-```nix
-{config, pkgs, ...}: {
-  specialisation."foo".configuration = {
-    environment.etc."specialisation".text = "foo";
-    # ..rest of config
-  };
-
-  specialisation."bar".configuration = {
-    environment.etc."specialisation".text = "bar";
-    # ..rest of config
-  };
-}
-```
-
-#### Home-Manager
-
-Home specialisations are read from `~/.local/share/home-manager/specialisation`.
-The config would look like this:
-
-```nix
-{config, pkgs, ...}: {
-  specialisation."foo".configuration = {
-    xdg.dataFile."home-manager/specialisation".text = "foo";
-    # ..rest of config
-  };
-
-  specialisation."bar".configuration = {
-    xdg.dataFile."home-manager/specialisation".text = "bar";
-    # ..rest of config
-  };
-}
-```
-
-## Status
-
-[![Dependency status](https://deps.rs/repo/github/viperML/nh/status.svg)](https://deps.rs/repo/github/viperML/nh)
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/nh.svg)](https://repology.org/project/unit/versions)
-
-## Hacking
-
-Just clone and `nix develop`. We also provide a `.envrc` for Direnv.
+Licensed under the [EUPL-1.2](LICENSE).
