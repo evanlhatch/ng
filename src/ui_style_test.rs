@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::ui_style::{Colors, Symbols, Print, spinner_message, success_message, separator, header};
+    use nh::ui_style::{Colors, Symbols, spinner_message, success_message, separator, header};
 
     #[test]
     fn test_colors() {

@@ -15,8 +15,8 @@ mod tests {
     // Mock platform args for testing
     #[derive(Debug)]
     struct MockPlatformArgs {
-        hostname: Option<String>,
-        bypass_root_check: bool,
+        _hostname: Option<String>,
+        _bypass_root_check: bool,
     }
 
     impl PlatformRebuildStrategy for MockPlatformStrategy {
@@ -29,7 +29,7 @@ mod tests {
             Ok(())
         }
 
-        fn get_toplevel_installable(&self, op_ctx: &OperationContext, platform_args: &Self::PlatformArgs) -> Result<Installable> {
+        fn get_toplevel_installable(&self, op_ctx: &OperationContext, _platform_args: &Self::PlatformArgs) -> Result<Installable> {
             println!("MockPlatform: get_toplevel_installable called");
             // Just return the installable from common_args
             Ok(op_ctx.common_args.installable.clone())
@@ -88,16 +88,18 @@ mod tests {
         };
 
         // Create operation context
+        let nix_interface = crate::nix_interface::NixInterface::new(0);
         let op_ctx = OperationContext::new(
-            &common_args,
+            common_args, // Pass by value
             &update_args,
             0, // verbose_count
+            nix_interface,
         );
 
         // Create mock platform args
         let platform_args = MockPlatformArgs {
-            hostname: Some("test-host".to_string()),
-            bypass_root_check: true,
+            _hostname: Some("test-host".to_string()),
+            _bypass_root_check: true,
         };
 
         // Create mock platform strategy

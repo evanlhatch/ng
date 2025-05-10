@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use crate::util::{
+    use nh::util::{
         compare_semver, add_verbosity_flags, is_stdout_tty, run_cmd, run_cmd_inherit_stdio,
-        UtilCommandError, manage_out_path, run_piped_commands, MaybeTempPath
+        UtilCommandError, manage_out_path, run_piped_commands
     };
-    use std::process::{Command, Stdio};
+    use std::process::Command;
     use std::path::PathBuf;
 
     #[test]
@@ -177,8 +177,10 @@ mod tests {
     #[test]
     fn test_run_piped_commands() {
         // Test piping echo to grep
-        let cmd1 = Command::new("echo").arg("hello\nworld\nhello again");
-        let cmd2 = Command::new("grep").arg("hello");
+        let mut cmd1 = Command::new("echo");
+        cmd1.arg("hello\nworld\nhello again");
+        let mut cmd2 = Command::new("grep");
+        cmd2.arg("hello");
         
         let result = run_piped_commands(cmd1, cmd2);
         assert!(result.is_ok());
@@ -191,13 +193,14 @@ mod tests {
         }
         
         // Test with a failing first command
-        let cmd1 = Command::new("command_that_does_not_exist_ever");
-        let cmd2 = Command::new("grep").arg("hello");
+        let cmd1_fail = Command::new("command_that_does_not_exist_ever");
+        let mut cmd2_fail_1 = Command::new("grep");
+        cmd2_fail_1.arg("hello");
         
-        let result = run_piped_commands(cmd1, cmd2);
-        assert!(result.is_err());
+        let result_fail1 = run_piped_commands(cmd1_fail, cmd2_fail_1);
+        assert!(result_fail1.is_err());
         
-        match result {
+        match result_fail1 {
             Err(err) => {
                 match err {
                     UtilCommandError::SpawnFailed { command_str, io_error: _ } => {
@@ -210,13 +213,15 @@ mod tests {
         }
         
         // Test with a failing second command
-        let cmd1 = Command::new("echo").arg("hello");
-        let cmd2 = Command::new("grep").arg("--invalid-option");
+        let mut cmd1_ok = Command::new("echo");
+        cmd1_ok.arg("hello");
+        let mut cmd2_fail_2 = Command::new("grep");
+        cmd2_fail_2.arg("--invalid-option");
         
-        let result = run_piped_commands(cmd1, cmd2);
-        assert!(result.is_err());
+        let result_fail2 = run_piped_commands(cmd1_ok, cmd2_fail_2);
+        assert!(result_fail2.is_err());
         
-        match result {
+        match result_fail2 {
             Err(err) => {
                 match err {
                     UtilCommandError::NonZeroStatus { command_str, status_code, stdout: _, stderr: _ } => {

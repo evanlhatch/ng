@@ -1,15 +1,15 @@
 use std::ffi::{OsStr, OsString};
-use std::process::{Command as StdCommand, Stdio};
+use std::process::Command as StdCommand; // Stdio was unused
 
 use color_eyre::{
-    eyre::{bail, eyre, Context},
+    eyre::{eyre}, // bail, Context were unused
     Result,
 };
 use thiserror::Error;
 use tracing::{debug, info};
 
 use crate::installable::Installable;
-use crate::util::{self, UtilCommandError};
+use crate::util::{self}; // UtilCommandError was unused
 
 #[derive(Debug)]
 pub struct Command {
@@ -53,6 +53,14 @@ impl Command {
     {
         for elem in args {
             self.args.push(elem.as_ref().to_os_string());
+        }
+        self
+    }
+
+    pub fn add_verbosity_flags(mut self, verbosity_level: u8) -> Self {
+        let effective_level = std::cmp::min(verbosity_level, 7); // Cap at 7
+        for _ in 0..effective_level {
+            self.args.push(OsString::from("-v"));
         }
         self
     }

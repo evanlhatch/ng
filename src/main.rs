@@ -1,23 +1,3 @@
-mod check_git;
-mod clean;
-mod commands;
-mod completion;
-mod darwin;
-mod error_handler;
-mod generations;
-mod home;
-mod installable;
-mod interface;
-mod json;
-mod lint;
-mod logging;
-mod nixos;
-mod progress;
-mod search;
-mod update;
-mod util;
-mod ui_style;
-mod tables;
 
 #[cfg(test)]
 mod error_handler_test;
@@ -33,7 +13,11 @@ mod util_test;
 mod ui_style_test;
 
 use color_eyre::Result;
-use tracing::debug;
+// use tracing::debug; // Was used by self_elevate
+
+// Use the library crate `nh` for its modules
+// use nh::interface; // Not used directly, Main is fully qualified
+// use nh::logging; // Not used directly, setup_logging is fully qualified
 
 const NH_VERSION: &str = env!("CARGO_PKG_VERSION");
 const NH_REV: Option<&str> = option_env!("NH_REV");
@@ -56,10 +40,10 @@ fn main() -> Result<()> {
         }
     }
 
-    let args = <crate::interface::Main as clap::Parser>::parse();
+    let args = <nh::interface::Main as clap::Parser>::parse();
     let verbose_count = args.verbose; // Extract verbosity count
     
-    crate::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
+    nh::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
     tracing::debug!("{args:#?}");
     tracing::debug!(%NH_VERSION, ?NH_REV);
 
@@ -70,14 +54,4 @@ fn main() -> Result<()> {
     }
 
     args.command.run(verbose_count) // Pass the count to run
-}
-
-fn self_elevate() -> ! {
-    use std::os::unix::process::CommandExt;
-
-    let mut cmd = std::process::Command::new("sudo");
-    cmd.args(std::env::args());
-    debug!("{:?}", cmd);
-    let err = cmd.exec();
-    panic!("{}", err);
 }

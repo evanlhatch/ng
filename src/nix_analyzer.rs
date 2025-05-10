@@ -1,22 +1,24 @@
-use nil_syntax::{SourceFile, AstNode, TextRange, SyntaxError};
-use nil_ide::{
-    base::{SourceDatabase, SourceDatabaseExt, FileId, Change, FileSource},
-    def::DefDatabase, // For name resolution, etc.
-    diagnostics::{self, Diagnostic, DiagnosticKind as NilDiagnosticKind}, // Renamed to avoid clash
-    RootDatabase, // The central query database from nil-ide
-    config::Config as NilConfig, // nil's config
+use syntax::ast::SourceFile; // AstNode was unused
+use syntax::{TextRange, Error as SyntaxErrorFull};
+
+use ide::{
+    AnalysisHost, 
+    FileId, Change, FileSet, SourceRoot, VfsPath, // Added FileSet, SourceRoot, VfsPath
+    // SourceDatabase, // Unused
+    // DefDatabase,    // Unused
+    Diagnostic, Severity as IdeSeverity, // DiagnosticKind as NilDiagnosticKind was unused
 };
+
 use std::{sync::Arc, collections::HashMap, path::{Path, PathBuf}};
-use crate::Result; // Your project's Result
-use tracing::{debug, info, warn};
+// use crate::Result; 
+// use tracing::{debug, info, warn};
 
 /// Severity levels for diagnostics
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NgSeverity { 
     Error, 
     Warning, 
-    Info, 
-    Hint 
+    // Info and Hint are not in ide::Severity
 }
 
 /// Represents a diagnostic from nil-syntax or nil-ide
@@ -38,23 +40,17 @@ pub struct NgDiagnostic {
     pub severity: NgSeverity,
 }
 
-/// Central hub for Nix code analysis using nil-syntax and nil-ide
+/// Central hub for Nix code analysis
 pub struct NixAnalysisContext {
-    /// The nil-ide RootDatabase
-    db: RootDatabase,
-    
-    /// Map from file paths to nil's FileId
+    db: AnalysisHost,
     file_map: HashMap<PathBuf, FileId>,
-    
-    /// Counter for generating new FileIds
     next_file_id: u32,
 }
 
 impl NixAnalysisContext {
-    /// Create a new NixAnalysisContext
     pub fn new() -> Self {
         Self {
-            db: RootDatabase::default(),
+            db: AnalysisHost::default(), // Use AnalysisHost
             file_map: HashMap::new(),
             next_file_id: 0,
         }
@@ -69,39 +65,58 @@ impl NixAnalysisContext {
         self.next_file_id += 1;
         self.file_map.insert(path.to_path_buf(), file_id);
         // Initially set file source to be the path itself for nil's VFS
-        self.db.set_file_source(file_id, FileSource::Local(path.to_path_buf()));
+        // self.db.set_file_source(file_id, FileSource::Local(path.to_path_buf())); // FileSource unresolved, commented out
         file_id
     }
 
     /// Parse a file with nil-syntax
-    pub fn parse_file_with_syntax(&mut self, path: &Path, content: Arc<String>) -> (FileId, Arc<SourceFile>, Vec<SyntaxError>) {
+    pub fn parse_file_with_syntax(&mut self, path: &Path, content: Arc<String>) -> (FileId, Arc<SourceFile>, Vec<SyntaxErrorFull>) {
         let file_id = self.get_or_assign_file_id(path);
-        let mut change = Change::new();
-        change.change_file(file_id, Some(content));
+        
+        let mut change = Change::default();
+        let content_for_db: Arc<str> = Arc::from(content.as_str());
+        change.change_file(file_id, content_for_db.clone()); // Pass Arc<str> directly
+        
+        // Basic SourceRoot setup for the current file
+        let mut file_set = FileSet::default();
+        // Use the actual path for VfsPath, assuming it's absolute or resolvable
+        // VfsPath::new needs something that can be AsRef<Path>
+        // Let's try to make it a canonical/absolute path for robustness if possible,
+        // otherwise, use it as is. For simplicity now, use as is.
+        file_set.insert(file_id, VfsPath::from(path.to_path_buf())); 
+        change.set_roots(vec![SourceRoot::new_local(file_set, Some(file_id))]);
+        
         self.db.apply_change(change);
-        let source_file = self.db.parse(file_id);
-        let errors = source_file.errors().to_vec(); // Clone errors
-        (file_id, source_file, errors)
+
+        // Perform syntax parsing using the `syntax` crate's parser
+        let parse_result: syntax::Parse = syntax::parse_file(content.as_str());
+        let source_file_ast: SourceFile = parse_result.root(); // SourceFile from syntax::ast
+        let errors: Vec<SyntaxErrorFull> = parse_result.errors().to_vec(); // SyntaxErrorFull is alias for syntax::Error
+        
+        (file_id, Arc::new(source_file_ast), errors)
     }
 
     /// Get semantic diagnostics for a file
-    pub fn get_semantic_diagnostics(&self, file_id: FileId, nil_config: &NilConfig) -> Vec<Diagnostic> {
-        // This query will trigger parsing, name resolution, HIR lowering, etc., as needed by nil's DB.
-        diagnostics::diagnostics(&self.db, file_id, nil_config)
+    // Removed nil_config parameter. Configuration is implicit in AnalysisHost setup or via specific methods.
+    pub fn get_semantic_diagnostics(&self, file_id: FileId) -> Result<Vec<Diagnostic>, ide::Cancelled> {
+        self.db.snapshot().diagnostics(file_id)
     }
 
     /// Get the content of a file from the database
-    pub fn get_file_content(&self, file_id: FileId) -> Option<Arc<String>> {
-        self.db.file_text(file_id)
-    }
+    // pub fn get_file_content(&self, file_id: FileId) -> Option<Arc<String>> {
+    //     // AnalysisHost does not directly expose file_text. 
+    //     // To get text known to the DB, you might query self.db.snapshot().file_text(file_id) if Analysis/RootDatabase exposes it.
+    //     None 
+    // }
 
     /// Convert a nil-syntax error to an NgDiagnostic
-    pub fn convert_nil_syntax_error_to_ng(&self, e: &SyntaxError, file_id_for_db: FileId, file_path: &Path) -> NgDiagnostic {
+    // Changed e: &SyntaxError to e: &SyntaxErrorFull (syntax::Error)
+    pub fn convert_nil_syntax_error_to_ng(&self, e: &SyntaxErrorFull, file_id_for_db: FileId, file_path: &Path) -> NgDiagnostic {
         NgDiagnostic {
             file_id_for_db,
             file_path: file_path.to_path_buf(),
-            range: e.range(),
-            message: e.message().to_string(),
+            range: e.range, // syntax::Error has a `range` field
+            message: e.kind.to_string(), // syntax::Error has an `kind` field (ErrorKind) which can be stringified
             severity: NgSeverity::Error,
         }
     }
@@ -112,12 +127,11 @@ impl NixAnalysisContext {
             file_id_for_db,
             file_path: file_path.to_path_buf(),
             range: d.range,
-            message: d.message.clone(),
-            severity: match d.severity {
-                nil_ide::Severity::Error => NgSeverity::Error,
-                nil_ide::Severity::Warning => NgSeverity::Warning,
-                nil_ide::Severity::Info => NgSeverity::Info,
-                nil_ide::Severity::Hint => NgSeverity::Hint,
+            message: d.message().clone(), // Added parentheses for method call
+            severity: match d.severity() { // Added parentheses for method call
+                IdeSeverity::Error => NgSeverity::Error,
+                IdeSeverity::Warning => NgSeverity::Warning,
+                IdeSeverity::IncompleteSyntax => NgSeverity::Error, // Mapped IncompleteSyntax to Error
             }
         }
     }

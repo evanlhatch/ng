@@ -468,7 +468,7 @@ where
 }
 
 impl HomeReplArgs {
-    fn run(self, verbose_count: u8) -> Result<()> {
+    fn run(self, _verbose_count: u8) -> Result<()> {
         // Use NH_HOME_FLAKE if available, otherwise use the provided installable
         let installable = if let Ok(home_flake) = env::var("NH_HOME_FLAKE") {
             debug!("Using NH_HOME_FLAKE: {}", home_flake);

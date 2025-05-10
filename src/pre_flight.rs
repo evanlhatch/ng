@@ -2,52 +2,60 @@ use crate::Result;
 use crate::context::OperationContext;
 use crate::workflow_strategy::PlatformRebuildStrategy;
 use crate::error_handler;
-// Phase 3: Will be uncommented when implementing nil integration
-// use crate::nix_analyzer::{NixAnalysisContext, NgDiagnostic, NgSeverity};
+use crate::nix_analyzer::{NixAnalysisContext, NgSeverity}; 
 use crate::progress;
-// Phase 3: Will be uncommented when implementing nil integration
-// use nil_ide::config::Config as NilConfig;
-use tracing::{info, warn, debug, error};
-use color_eyre::eyre::{bail, eyre};
-use std::path::{Path, PathBuf};
+use tracing::{info, warn, debug}; // error was unused
+use color_eyre::eyre::bail; // eyre was unused
+use std::path::PathBuf; // Path was unused
 use std::sync::Arc;
 use walkdir::WalkDir;
 
 /// Represents the status of a pre-flight check
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CheckStatusReport {
-    /// Check passed without issues
     Passed,
-    
-    /// Check passed but with warnings
     PassedWithWarnings,
-    
-    /// Check failed critically and should halt the process
     FailedCritical,
 }
 
 /// Trait for pre-flight checks
 pub trait PreFlightCheck: std::fmt::Debug + Send + Sync {
-    /// Returns the name of the check
     fn name(&self) -> &str;
-    
-    /// Runs the check
-    ///
-    /// # Arguments
-    ///
-    /// * `op_ctx` - The operation context
-    /// * `platform_strategy` - The platform strategy
-    /// * `platform_args` - The platform-specific arguments
-    ///
-    /// # Returns
-    ///
-    /// * `Result<CheckStatusReport>` - The status of the check
     fn run<S: PlatformRebuildStrategy>(
         &self,
         op_ctx: &OperationContext,
         platform_strategy: &S,
         platform_args: &S::PlatformArgs,
     ) -> Result<CheckStatusReport>;
+}
+
+// Enum wrapper to make PreFlightCheck usable without dyn Trait
+#[derive(Debug)] // Added Debug for consistency
+pub enum AnyPreFlightCheck {
+    NixParse(NixParsePreFlightCheck),
+    Semantic(SemanticPreFlightCheck),
+    // Add other check types here if they exist
+}
+
+impl AnyPreFlightCheck {
+    pub fn name(&self) -> &str {
+        match self {
+            AnyPreFlightCheck::NixParse(c) => c.name(),
+            AnyPreFlightCheck::Semantic(c) => c.name(),
+        }
+    }
+
+    pub fn run<S: PlatformRebuildStrategy>(
+        &self,
+        op_ctx: &OperationContext,
+        platform_strategy: &S,
+        platform_args: &S::PlatformArgs,
+    ) -> Result<CheckStatusReport> {
+        match self {
+            AnyPreFlightCheck::NixParse(c) => c.run(op_ctx, platform_strategy, platform_args),
+            AnyPreFlightCheck::Semantic(c) => c.run(op_ctx, platform_strategy, platform_args),
+        }
+    }
 }
 
 /// Finds all .nix files in the current directory
@@ -85,7 +93,7 @@ impl PreFlightCheck for NixParsePreFlightCheck {
     
     fn run<S: PlatformRebuildStrategy>(
         &self,
-        op_ctx: &OperationContext,
+        _op_ctx: &OperationContext,
         _platform_strategy: &S,
         _platform_args: &S::PlatformArgs,
     ) -> Result<CheckStatusReport> {
@@ -162,7 +170,7 @@ impl PreFlightCheck for SemanticPreFlightCheck {
         
         // Parse each file and collect semantic diagnostics
         let mut all_diagnostics = Vec::new();
-        let nil_config = NilConfig::default();
+        // let nil_config = NilConfig::default(); // NilConfig removed
         
         for path in nix_files {
             let content = match std::fs::read_to_string(&path) {
@@ -179,15 +187,26 @@ impl PreFlightCheck for SemanticPreFlightCheck {
             // Skip semantic analysis if there are syntax errors
             if !syntax_errors.is_empty() {
                 debug!("Skipping semantic analysis for {} due to syntax errors", path.display());
-                continue;
+                // Also report these syntax errors from semantic check if we decide not to have a separate syntax check
+                for error in &syntax_errors {
+                    all_diagnostics.push(analyzer.convert_nil_syntax_error_to_ng(error, file_id, &path));
+                }
+                // If strict, syntax errors found here should also fail the semantic check.
+                // For now, just continue to allow aggregation of only semantic errors if syntax pass was separate.
+                continue; 
             }
             
             // Get semantic diagnostics
-            let semantic_diagnostics = analyzer.get_semantic_diagnostics(file_id, &nil_config);
-            
-            // Convert semantic diagnostics to NgDiagnostic
-            for diag in &semantic_diagnostics {
-                all_diagnostics.push(analyzer.convert_nil_diagnostic_to_ng(diag, file_id, &path));
+            match analyzer.get_semantic_diagnostics(file_id) { // Removed nil_config argument, handle Cancellable
+                Ok(semantic_diagnostics_vec) => {
+                    for diag in &semantic_diagnostics_vec {
+                        all_diagnostics.push(analyzer.convert_nil_diagnostic_to_ng(diag, file_id, &path));
+                    }
+                }
+                Err(_cancelled) => {
+                    warn!("Semantic analysis for {} was cancelled.", path.display());
+                    // Optionally treat cancellation as a failure or warning
+                }
             }
         }
         
@@ -215,10 +234,10 @@ impl PreFlightCheck for SemanticPreFlightCheck {
 }
 
 /// Returns the core pre-flight checks to run
-pub fn get_core_pre_flight_checks(_op_ctx: &OperationContext) -> Vec<Box<dyn PreFlightCheck>> {
+pub fn get_core_pre_flight_checks(_op_ctx: &OperationContext) -> Vec<AnyPreFlightCheck> {
     vec![
-        Box::new(NixParsePreFlightCheck),
-        Box::new(SemanticPreFlightCheck),
+        AnyPreFlightCheck::NixParse(NixParsePreFlightCheck),
+        AnyPreFlightCheck::Semantic(SemanticPreFlightCheck),
         // Add more checks here as needed
     ]
 }
@@ -239,7 +258,7 @@ pub fn run_shared_pre_flight_checks<S: PlatformRebuildStrategy>(
     op_ctx: &OperationContext,
     platform_strategy: &S,
     platform_args: &S::PlatformArgs,
-    checks_to_run: &[Box<dyn PreFlightCheck>],
+    checks_to_run: &[AnyPreFlightCheck],
 ) -> Result<()> {
     if op_ctx.common_args.no_preflight {
         info!("[⏭️ Pre-flight] All checks skipped due to --no-preflight.");

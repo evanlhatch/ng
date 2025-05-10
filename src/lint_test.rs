@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::lint::{is_hidden, command_exists, LintSummary, CheckStatus, LintOutcome};
+    use nh::lint::{is_hidden, command_exists, LintSummary, CheckStatus, LintOutcome};
     use std::path::Path;
 
     #[test]

@@ -60,10 +60,11 @@ atty = "0.2"
 walkdir = "2"
 # Dependencies for refactoring (Phase 1.2)
 chumsky = "0.9"
-# Dependencies for Phase 3 (nil integration)
-# These would be uncommented in a real implementation
-# nil-syntax = "0.1.0"
-# nil-ide = "0.1.0"
+
+# Dependencies for Nix analysis and interaction (from the local nil project)
+syntax = { path = "../nil/crates/syntax" }
+ide = { path = "../nil/crates/ide" }
+nix-interop = { path = "../nil/crates/nix-interop" } # Re-enabling for integration
 
 [target.'cfg(target_os="macos")'.dependencies]
 system-configuration = "0.6.1"

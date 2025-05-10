@@ -5,7 +5,7 @@ use std::{
     time::SystemTime,
 };
 
-use cli_table::{print_stdout, Cell, Table, Style};
+use cli_table::{Cell, Table, Style}; // print_stdout was unused
 use color_eyre::eyre::{bail, eyre, Context, ContextCompat};
 use nix::errno::Errno;
 use nix::{
@@ -34,7 +34,7 @@ type GenerationsTagged = BTreeMap<Generation, ToBeRemoved>;
 type ProfilesTagged = HashMap<PathBuf, GenerationsTagged>;
 
 impl interface::CleanMode {
-    pub fn run(&self, verbose_count: u8) -> Result<()> {
+    pub fn run(&self, _verbose_count: u8) -> Result<()> {
         let mut profiles = Vec::new();
         let mut gcroots_tagged: HashMap<PathBuf, ToBeRemoved> = HashMap::new();
         let now = SystemTime::now();

@@ -10,7 +10,7 @@ fn main() -> Result<()> {
     println!("Testing NixInterface...");
     
     // Create a NixInterface
-    let nix_interface = NixInterface::new(2);
+    let _nix_interface = NixInterface::new(2);
     
     // Create a simple installable
     let installable = Installable::Flake {

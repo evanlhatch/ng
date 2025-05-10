@@ -1,8 +1,8 @@
 use crate::workflow_strategy::{PlatformRebuildStrategy, ActivationMode};
-use crate::workflow_types::CommonRebuildArgs;
+// use crate::workflow_types::CommonRebuildArgs; // Unused
 use crate::context::OperationContext;
-use crate::installable::Installable;
-use crate::util::{self, MaybeTempPath}; // For manage_out_path
+// use crate::installable::Installable; // Unused
+use crate::util::{self}; // MaybeTempPath was unused, util::self might still be needed
 // Phase 3: Will be uncommented when implementing nil integration
 // use crate::pre_flight::{self, get_core_pre_flight_checks, run_shared_pre_flight_checks};
 use crate::Result; // from color_eyre
@@ -164,10 +164,9 @@ pub fn execute_rebuild_workflow<S: PlatformRebuildStrategy>(
         // Use NixInterface to build the configuration
         built_profile_path = op_ctx.nix_interface.build_configuration(
             &toplevel_installable,
-            out_path_manager.get_path(),
             &op_ctx.common_args.extra_build_args,
             op_ctx.common_args.no_nom,
-            op_ctx.verbose_count
+            Some(out_path_manager.get_path()), // Pass out_link as Option
         )?;
     }
 

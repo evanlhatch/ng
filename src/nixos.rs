@@ -1,19 +1,19 @@
-use std::fs;
+// use std::fs; // Unused
 use std::path::{PathBuf};
-use std::process::Command as StdCommand;
-use color_eyre::eyre::{bail, eyre, Result};
-use nix;
+// use std::process::Command as StdCommand; // Unused
+use color_eyre::eyre::{eyre, Result}; // bail was unused
+// use nix; // Unused
 use walkdir::WalkDir;
-use rayon::prelude::*;
-use tracing::{info, warn, debug};
+// use rayon::prelude::*; // Unused
+use tracing::{info, debug}; // warn was unused
 
 // Interface and core imports
 use crate::interface::{OsArgs, OsRebuildArgs, OsSubcommand, OsReplArgs, OsGenerationsArgs};
 use crate::installable::Installable;
-use crate::commands::{Command, Build};
+use crate::commands::Command; // Build was unused
 use crate::util::get_hostname;
-use crate::generations;
-use crate::update::update;
+// use crate::generations; // Unused
+// use crate::update::update; // Unused
 
 // Workflow refactoring imports
 use crate::workflow_executor::execute_rebuild_workflow;
@@ -23,10 +23,10 @@ use crate::context::OperationContext;
 use crate::nix_interface::NixInterface;
 use crate::workflow_types::CommonRebuildArgs;
 
-// Constants
-const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
-const CURRENT_PROFILE: &str = "/run/current-system";
-const SPEC_LOCATION: &str = "/etc/specialisation";
+// Constants removed as they were only used in the deleted OsRebuildArgs::rebuild method
+// const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
+// const CURRENT_PROFILE: &str = "/run/current-system";
+// const SPEC_LOCATION: &str = "/etc/specialisation";
 
 impl OsArgs {
     /// Helper function to create CommonRebuildArgs from OsRebuildArgs
@@ -51,7 +51,7 @@ impl OsArgs {
         let core_common_args = Self::create_common_rebuild_args(cli_args);
         
         let op_ctx = OperationContext::new(
-            &core_common_args,
+            core_common_args, // Pass by value
             &cli_args.update_args,
             verbose_count,
             NixInterface::new(verbose_count),
@@ -89,221 +89,9 @@ impl OsArgs {
     }
 }
 
-#[derive(Debug)]
-enum OsRebuildVariant {
-    Build,
-    Switch,
-    Boot,
-    Test,
-}
+// OsRebuildVariant enum removed (lines 93-98 of original)
 
-impl OsRebuildArgs {
-    fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
-        use OsRebuildVariant::*;
-
-        let elevate = if self.bypass_root_check {
-            warn!("Bypassing root check, now running nix as root");
-            false
-        } else {
-            if nix::unistd::Uid::effective().is_root() {
-                bail!("Don't run nh os as root. I will call sudo internally as needed");
-            }
-            true
-        };
-
-        // Add pre-flight checks
-        let run_preflight = !self.common.common.no_preflight;
-        if run_preflight {
-            // Git Check
-            let pb = crate::progress::start_spinner("[🔍 Git] Checking status...");
-            match crate::check_git::run_git_check_warning_only() {
-                Ok(_) => {
-                    // Git check passed or issued warnings
-                    crate::progress::finish_spinner_success(&pb, "[✅ Git] Check complete (warnings above if any).");
-                },
-                Err(e) => {
-                    crate::progress::finish_spinner_fail(&pb);
-                    crate::error_handler::report_failure(
-                        "Git Check",
-                        "Failed to check Git status",
-                        Some(e.to_string()),
-                        vec![
-                            "Ensure git is installed and accessible".to_string(),
-                            "Check if this is a git repository".to_string(),
-                        ]
-                    );
-                    bail!("Git check failed");
-                }
-            }
-            
-            // Parse Check
-            let pb = crate::progress::start_spinner("[🔍 Parse] Checking Nix syntax...");
-            match run_parallel_parse_check(verbose_count) {
-                Ok(_) => {
-                    crate::progress::finish_spinner_success(&pb, "[✅ Parse] Syntax check passed");
-                },
-                Err(e) => {
-                    crate::progress::finish_spinner_fail(&pb);
-                    crate::error_handler::report_failure(
-                        "Parse Check", 
-                        "Nix syntax errors found",
-                        Some(e),
-                        vec!["Fix the syntax errors reported above".to_string()]
-                    );
-                    bail!("Parse check failed");
-                }
-            }
-            
-            // Lint Check
-            let pb = crate::progress::start_spinner("[🔍 Lint] Running formatters and linters...");
-            
-            let use_strict_lint = self.common.common.strict_lint || self.common.common.full || self.common.common.medium;
-            
-            match crate::lint::run_lint_checks(use_strict_lint, verbose_count) {
-                Ok(lint_summary) => {
-                    if matches!(lint_summary.outcome, Some(crate::lint::LintOutcome::CriticalFailure(_))) {
-                        crate::progress::finish_spinner_fail(&pb);
-                        crate::error_handler::report_failure(
-                            "Lint", 
-                            "Linting failed in strict mode",
-                            None,
-                            vec![
-                                "Fix the linting issues reported above".to_string(),
-                                "Use --no-preflight to skip linting checks".to_string()
-                            ]
-                        );
-                        bail!("Lint check failed");
-                    } else {
-                        crate::progress::finish_spinner_success(&pb, &format!(
-                            "[✅ Lint] Check {}",
-                            if matches!(lint_summary.outcome, Some(crate::lint::LintOutcome::Warnings)) {
-                                "completed with warnings"
-                            } else {
-                                "passed"
-                            }
-                        ));
-                    }
-                }
-                Err(e) => {
-                    crate::progress::finish_spinner_fail(&pb);
-                    crate::error_handler::report_failure(
-                        "Lint",
-                        "Failed to run linters",
-                        Some(e.to_string()),
-                        vec![
-                            "Ensure formatters/linters are installed".to_string(),
-                            "Use --no-preflight to skip linting".to_string()
-                        ]
-                    );
-                    bail!("Lint check failed");
-                }
-            }
-        }
-
-        // Determine hostname
-        let hostname = match self.hostname.clone() {
-            Some(h) => h,
-            None => get_hostname().map_err(|e| eyre!("Failed to get hostname: {}", e))?,
-        };
-        debug!("Using hostname: {}", hostname);
-
-        // Determine installable
-        let installable = toplevel_for(self.common.installable.clone(), &hostname, &self)?;
-
-        // Handle update
-        if self.update_args.update || self.update_args.update_input.is_some() {
-            update(&installable, self.update_args.update_input.clone())?;
-        }
-
-        // Build
-        let is_just_build_variant = matches!(variant, Build);
-        let dry = self.common.common.dry;
-        let ask = self.common.common.ask;
-
-        if is_just_build_variant && (ask || dry) {
-            warn!("`--ask` and `--dry` have no effect for `nh os build`");
-        }
-
-        // Determine out_link
-        let out_link = self.common.common.out_link.clone();
-
-        // Build the configuration
-        // Use a simpler approach for building
-        let mut build_cmd = Command::new("nix")
-            .arg("build")
-            .arg(&installable.to_args().join(" "));
-        
-        // Add --no-link if no_nom is false
-        if !self.common.common.no_nom {
-            build_cmd = build_cmd.arg("--no-link");
-        }
-        
-        // Add extra args one by one
-        for arg in &self.extra_args {
-            build_cmd = build_cmd.arg(arg);
-        }
-
-        // Add out_link if specified
-        if let Some(out_link) = &out_link {
-            build_cmd = build_cmd.arg("--out-link").arg(out_link);
-        }
-
-        let result_path = if !dry || is_just_build_variant {
-            build_cmd.run()?;
-            out_link.unwrap_or_else(|| PathBuf::from("./result"))
-        } else {
-            info!("Dry run, skipping build");
-            PathBuf::from("/tmp/dry-run-result")
-        };
-
-        // Show diff
-        if !is_just_build_variant && !dry {
-            if let Ok(current_system) = fs::canonicalize(CURRENT_PROFILE) {
-                Command::new("nvd")
-                    .arg("diff")
-                    .arg(current_system)
-                    .arg(&result_path)
-                    .run()
-                    .unwrap_or_else(|e| {
-                        warn!("Failed to run nvd diff: {}", e);
-                    });
-            }
-        }
-
-        // Confirm
-        if ask && !is_just_build_variant && !dry {
-            info!("Confirm activation? [y/N] ");
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input)?;
-            if !input.trim().eq_ignore_ascii_case("y") {
-                bail!("Activation cancelled");
-            }
-        }
-
-        // Activate
-        if !is_just_build_variant && !dry {
-            let action = match variant {
-                Switch => "switch",
-                Boot => "boot",
-                Test => "test",
-                Build => unreachable!(),
-            };
-
-            Command::new("sudo")
-                .arg(format!("{}/bin/switch-to-configuration", result_path.display()))
-                .arg(action)
-                .message(format!("Activating configuration ({})", action))
-                .run()?;
-        }
-
-        // Cleanup
-        if self.common.common.clean && !is_just_build_variant && !dry {
-            perform_cleanup(verbose_count)?;
-        }
-
-        Ok(())
-    }
-}
+// impl OsRebuildArgs { fn rebuild(...) } block removed (lines 100-301 of original)
 
 /// Runs a parallel parse check on all .nix files
 pub fn run_parallel_parse_check(verbose_count: u8) -> Result<(), String> {
@@ -373,17 +161,7 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
         })
 }
 
-/// Performs cleanup after a successful rebuild
-pub fn perform_cleanup(_verbose_count: u8) -> Result<()> {
-    info!("Performing cleanup...");
-    
-    Command::new("sudo")
-        .args(["nix-store", "--gc"])
-        .message("Running garbage collection")
-        .run()?;
-    
-    Ok(())
-}
+// perform_cleanup function removed (lines 358-366 of original)
 
 /// Determines the toplevel installable for a NixOS configuration
 pub fn toplevel_for<T>(installable: Installable, hostname: &str, _args: &T) -> Result<Installable> {
@@ -407,14 +185,14 @@ pub fn toplevel_for<T>(installable: Installable, hostname: &str, _args: &T) -> R
 }
 
 impl OsReplArgs {
-    pub fn run(self, verbose_count: u8) -> Result<()> {
+    pub fn run(self, _verbose_count: u8) -> Result<()> {
         let hostname = match self.hostname.clone() {
             Some(h) => h,
             None => get_hostname().map_err(|e| eyre!("Failed to get hostname: {}", e))?,
         };
         debug!("Using hostname: {}", hostname);
 
-        let installable = self.installable.clone();
+        let _installable = self.installable.clone();
 
         Command::new("nix")
             .arg("repl")

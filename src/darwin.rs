@@ -394,7 +394,7 @@ impl DarwinRebuildArgs {
 }
 
 impl DarwinReplArgs {
-    fn run(self, verbose_count: u8) -> Result<()> {
+    fn run(self, _verbose_count: u8) -> Result<()> {
         // Use NH_DARWIN_FLAKE if available, otherwise use the provided installable
         let mut target_installable = if let Ok(darwin_flake) = env::var("NH_DARWIN_FLAKE") {
             debug!("Using NH_DARWIN_FLAKE: {}", darwin_flake);

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::nixos_strategy::NixosPlatformStrategy;
-    use crate::workflow_strategy::{PlatformRebuildStrategy, ActivationMode};
+    use crate::workflow_strategy::{PlatformRebuildStrategy};
     use crate::context::OperationContext;
     use crate::workflow_types::CommonRebuildArgs;
     use crate::installable::Installable;
@@ -28,11 +28,12 @@ mod tests {
             clean_after: false,
             extra_build_args: Vec::<OsString>::new(),
         };
-
+        let nix_interface = crate::nix_interface::NixInterface::new(verbose_count);
         OperationContext::new(
-            &common_args,
+            common_args, // Pass by value
             update_args,
             verbose_count,
+            nix_interface,
         )
     }
 
@@ -67,7 +68,7 @@ mod tests {
             hostname,
             specialisation: None,
             no_specialisation: false,
-            extra_args: Vec::<OsString>::new(),
+            extra_args: Vec::<String>::new(),
             bypass_root_check,
         }
     }

@@ -6,8 +6,8 @@ use crate::util::{self, UtilCommandError};
 use crate::Result; // from color_eyre
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand; // Alias to avoid conflict if Command struct exists
-use tracing::{info, warn, debug};
-use color_eyre::eyre::{bail, eyre, Context, Report};
+use tracing::{info, debug}; // warn was unused
+use color_eyre::eyre::{bail, eyre}; // Context, Report were unused
 
 /// Strategy implementation for NixOS platform
 pub struct NixosPlatformStrategy;
@@ -130,7 +130,7 @@ impl PlatformRebuildStrategy for NixosPlatformStrategy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*; // Removed as unused
     
     // Test pre_rebuild_hook for root check logic
     // Test get_toplevel_installable with various Installable inputs, hostname, specialisation flags
