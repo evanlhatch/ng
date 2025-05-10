@@ -241,19 +241,26 @@ pub struct CleanProxy {
 }
 
 #[derive(Debug, Clone, Subcommand)]
-/// Enhanced nix cleanup
+/// Enhanced nix cleanup with garbage collection and store optimization
 pub enum CleanMode {
-    /// Clean all profiles
+    /// Clean all profiles, run garbage collection, and optimize the nix store
     All(CleanArgs),
-    /// Clean the current user's profiles
+    /// Clean the current user's profiles, run garbage collection, and optimize the nix store
     User(CleanArgs),
-    /// Clean a specific profile
+    /// Clean a specific profile, run garbage collection, and optimize the nix store
     Profile(CleanProfileArgs),
 }
 
 #[derive(Args, Clone, Debug)]
 #[clap(verbatim_doc_comment)]
-/// Enhanced nix cleanup
+/// Enhanced nix cleanup with garbage collection and store optimization
+///
+/// By default, this command performs a multi-step cleanup process:
+/// 1. Removes old generations based on keep settings
+/// 2. Runs garbage collection with 'sudo nix-store --gc'
+/// 3. Optimizes the nix store with 'sudo nix-store --optimise'
+///
+/// Use --nogc and/or --nooptimise flags to skip specific steps.
 ///
 /// For --keep-since, see the documentation of humantime for possible formats: <https://docs.rs/humantime/latest/humantime/fn.parse_duration.html>
 pub struct CleanArgs {
@@ -273,9 +280,13 @@ pub struct CleanArgs {
     #[arg(long, short)]
     pub ask: bool,
 
-    /// Don't run nix store --gc
+    /// Don't run garbage collection (skip 'sudo nix-store --gc')
     #[arg(long)]
     pub nogc: bool,
+
+    /// Don't run store optimization (skip 'sudo nix-store --optimise')
+    #[arg(long)]
+    pub nooptimise: bool,
 
     /// Don't clean gcroots
     #[arg(long)]

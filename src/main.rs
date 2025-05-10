@@ -16,6 +16,8 @@ mod progress;
 mod search;
 mod update;
 mod util;
+mod ui_style;
+mod tables;
 
 #[cfg(test)]
 mod error_handler_test;
@@ -27,6 +29,8 @@ mod check_git_test;
 mod progress_test;
 #[cfg(test)]
 mod util_test;
+#[cfg(test)]
+mod ui_style_test;
 
 use color_eyre::Result;
 use tracing::debug;

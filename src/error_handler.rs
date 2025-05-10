@@ -1,10 +1,11 @@
 use crate::util::{add_verbosity_flags, run_cmd};
+use crate::ui_style::{Colors, Symbols, separator, header};
 use color_eyre::eyre::{Context, Result};
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 use regex::Regex;
 use std::process::Command;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 // Define Regexes for parsing error messages
 lazy_static! {
@@ -121,11 +122,11 @@ pub fn fetch_and_format_nix_log(drv_path: &str, verbose_count: u8) -> Result<Str
 {}
 {}
 {}",
-        "─".repeat(80).yellow(),
-        format!(" BUILD LOG FOR: {} ", drv_path).yellow().bold(),
-        "─".repeat(80).yellow(),
+        Colors::warning("─".repeat(80)),
+        Colors::warning(format!(" BUILD LOG FOR: {} ", Colors::emphasis(drv_path.to_string()))),
+        Colors::warning("─".repeat(80)),
         log_content.trim(),
-        "─".repeat(80).yellow(),
+        Colors::warning("─".repeat(80)),
     );
     
     Ok(formatted_log)
@@ -183,31 +184,131 @@ pub fn scan_log_for_recommendations(log_content: &str) -> Vec<String> {
 /// * `details` - Optional details (like logs or traces).
 /// * `recommendations` - A list of recommendations to fix the issue.
 pub fn report_failure(stage: &str, reason: &str, details: Option<String>, recommendations: Vec<String>) {
-    let width = 80;
-    let border_str = "─".repeat(width);
+    // Print header with consistent styling
+    eprintln!("\n{}", header(&format!("NH COMMAND ABORTED at Stage: {}", Colors::emphasis(stage.to_string()))));
     
-    // Print header
-    eprintln!("{}", border_str.yellow());
-    error!("│ {:<width$} │", format!("*** NH COMMAND ABORTED at Stage: {} ***", stage.bold()), width = width - 2);
-    eprintln!("{}", border_str.yellow());
+    // Print reason with improved styling
+    error!("{} {}", Symbols::error(), Colors::emphasis(reason.to_string()));
     
-    // Print reason
-    error!("│ {:<width$} │", format!("-> Reason: {}", reason.bold()), width = width - 2);
-    
-    // Print footer
-    eprintln!("{}", border_str.yellow());
+    // Print separator
+    eprintln!("{}", separator());
     
     // Print details if provided
-    if let Some(d) = details {
-        eprintln!("\n{}\n", d.trim());
+    if let Some(ref d) = details {
+        // For syntax errors, we'll enhance the formatting
+        if stage == "Parse Check" {
+            let enhanced_details = enhance_syntax_error_output(d);
+            eprintln!("\n{}\n", enhanced_details);
+        } else {
+            eprintln!("\n{}\n", d.trim());
+        }
     }
     
     // Print recommendations if any
     if !recommendations.is_empty() {
-        info!("{}", "-> Possible Issues & Recommendations:".blue().bold());
-        for rec in recommendations {
-            info!("   - {}", rec);
+        // For syntax errors, we'll generate more specific recommendations
+        let final_recommendations = if stage == "Parse Check" && details.is_some() {
+            generate_syntax_error_recommendations(details.as_ref().unwrap())
+        } else {
+            recommendations
+        };
+        
+        if !final_recommendations.is_empty() {
+            info!("{} {}", Symbols::info(), Colors::info(Colors::emphasis("Possible Issues & Recommendations:")));
+            for rec in final_recommendations {
+                info!("   • {}", rec);
+            }
         }
-        println!();
     }
+}
+
+/// Enhances the formatting of syntax error output
+pub fn enhance_syntax_error_output(error_details: &str) -> String {
+    let mut enhanced = String::new();
+    let mut file_count = 0;
+    
+    // Convert to owned string to avoid lifetime issues
+    let error_details_owned = error_details.to_string();
+    for line in error_details_owned.lines() {
+        if line.starts_with("Error in ") {
+            if file_count > 0 {
+                enhanced.push_str("\n");
+            }
+            file_count += 1;
+            
+            // Extract file path and highlight it
+            let file_path = line.trim_start_matches("Error in ").trim_end_matches(": ");
+            enhanced.push_str(&format!("{}:\n", Colors::info(Colors::emphasis(file_path))));
+        } else if line.contains("error: syntax error") {
+            // Highlight the error message with improved styling
+            enhanced.push_str(&format!("{} {}\n",
+                Symbols::error(),
+                Colors::error(Colors::emphasis(line))));
+        } else if line.contains("at ") && line.contains(".nix:") {
+            // Highlight the location with improved styling
+            enhanced.push_str(&format!("{} {}\n",
+                Symbols::info(),
+                Colors::warning(line)));
+        } else if line.contains("|") {
+            // Code snippet - keep as is but indent slightly and highlight
+            if line.contains("^") {
+                // This is the error indicator line
+                enhanced.push_str(&format!("    {}\n", Colors::error(line)));
+            } else {
+                enhanced.push_str(&format!("    {}\n", Colors::code(line)));
+            }
+        } else {
+            enhanced.push_str(&format!("{}\n", line));
+        }
+    }
+    
+    enhanced
+}
+
+/// Generates specific recommendations based on syntax error messages
+pub fn generate_syntax_error_recommendations(error_details: &str) -> Vec<String> {
+    let mut recommendations = Vec::new();
+    
+    // Common syntax errors and their recommendations
+    if error_details.contains("unexpected end of file, expecting INHERIT")
+       || error_details.contains("unexpected end of file, expecting }")
+    {
+        recommendations.push("Add missing closing brace '}' to complete the attribute set".to_string());
+    } else if error_details.contains("unexpected end of file, expecting ]")
+    {
+        recommendations.push("Add missing closing bracket ']' to complete the list".to_string());
+    } else if error_details.contains("unexpected end of file, expecting )")
+    {
+        recommendations.push("Add missing closing parenthesis ')' to complete the expression".to_string());
+    } else if error_details.contains("unexpected ;")
+    {
+        recommendations.push("Remove extra semicolon ';' or add an expression after it".to_string());
+    } else if error_details.contains("unexpected =")
+    {
+        recommendations.push("Check attribute name before '=' or ensure proper nesting of attribute sets".to_string());
+    } else if error_details.contains("unexpected }")
+    {
+        recommendations.push("Remove extra closing brace '}' or add a matching opening brace".to_string());
+    } else if error_details.contains("unexpected ]")
+    {
+        recommendations.push("Remove extra closing bracket ']' or add a matching opening bracket".to_string());
+    } else if error_details.contains("unexpected )")
+    {
+        recommendations.push("Remove extra closing parenthesis ')' or add a matching opening parenthesis".to_string());
+    } else if error_details.contains("unexpected in")
+    {
+        recommendations.push("Ensure 'let' expression has a matching 'in' keyword".to_string());
+    } else if error_details.contains("unexpected let")
+    {
+        recommendations.push("Ensure 'let' expression is properly formatted with 'in' keyword".to_string());
+    } else
+    {
+        // Generic recommendation if we can't identify the specific error
+        recommendations.push("Fix the syntax error according to the error message".to_string());
+    }
+    
+    // Add general recommendations
+    recommendations.push("Consider using a Nix formatter like 'alejandra' or 'nixpkgs-fmt' to automatically fix formatting issues".to_string());
+    
+    recommendations
 }

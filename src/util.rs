@@ -116,6 +116,9 @@ pub fn get_hostname() -> Result<String> {
 /// # Example
 ///
 /// ```
+/// use std::process::Command;
+/// use nh::util::add_verbosity_flags;
+///
 /// let mut cmd = Command::new("nix");
 /// add_verbosity_flags(&mut cmd, 3);
 /// // cmd now has args: ["-v", "-v", "-v"]

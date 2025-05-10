@@ -77,6 +77,51 @@ Nh supports both Flakes and classical NixOS configurations:
 You might want to check `nh os --help` for other values and the defaults from
 environment variables.
 
+### Enhanced Features
+
+Nh includes several enhanced features to improve the user experience:
+
+#### Pre-flight Checks
+
+Before building and activating configurations, nh performs several pre-flight checks:
+
+- **Git Status Check**: Warns about untracked .nix files that might not be included in the build
+- **Parse Check**: Validates syntax of .nix files to catch errors early
+- **Lint Check**: Runs formatters and linters on .nix files (when available)
+
+#### Build Modes
+
+Nh supports different build modes with increasing levels of validation:
+
+- **Quick Mode** (default): Basic checks only
+- **Medium Mode** (`--medium`): Adds evaluation check
+- **Full Mode** (`--full`): Adds dry-run build
+
+#### Improved Error Reporting
+
+Nh provides detailed error reports with:
+
+- Clear error messages with context
+- Syntax error highlighting
+- Actionable recommendations
+- Build logs for failed derivations
+
+#### Progress Indicators
+
+Nh shows progress for long-running operations:
+
+- Spinners for active processes
+- Clear success/failure indicators
+- Structured output for complex data
+
+#### Verbosity Levels
+
+Control the amount of output with multiple verbosity levels:
+
+- Default: Essential information only
+- `-v`: Adds debug information
+- `-vv`: Adds trace information
+
 #### Specialisations support
 
 Nh is capable of detecting which specialisation you are running, so it runs the

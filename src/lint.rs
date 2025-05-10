@@ -1,4 +1,5 @@
-use crate::util::{add_verbosity_flags, run_cmd};
+`11`1````1````1use crate::util::{add_verbosity_flags, run_cmd};
+use crate::ui_style::{Colors, Symbols};
 use color_eyre::eyre::{Context, Result};
 use std::collections::HashMap;
 use std::fs;
@@ -43,6 +44,42 @@ pub struct LintSummary {
     pub files_formatted: u32,
     /// Number of fixes applied by linters.
     pub fixes_applied: u32,
+}
+
+impl LintSummary {
+    /// Display the lint results as a table
+    pub fn display_as_table(&self) -> Result<()> {
+        if self.details.is_empty() {
+            return Ok(());
+        }
+        
+        let mut table_data = Vec::new();
+        
+        for (check_name, status) in &self.details {
+            let status_str = match status {
+                CheckStatus::Passed => "Passed",
+                CheckStatus::Failed => "Failed",
+                CheckStatus::Skipped => "Skipped",
+                CheckStatus::Warnings => "Warnings",
+            };
+            
+            let details = match status {
+                CheckStatus::Passed => "No issues found",
+                CheckStatus::Failed => "See error output above for details",
+                CheckStatus::Skipped => "Tool not installed or check disabled",
+                CheckStatus::Warnings => "Completed with warnings",
+            };
+            
+            table_data.push((check_name.clone(), status_str.to_string(), details.to_string()));
+        }
+        
+        // Try to display as table, but don't propagate errors
+        if let Err(e) = crate::tables::display_lint_results(table_data) {
+            debug!("Failed to display lint results as table: {}", e);
+        }
+        
+        Ok(())
+    }
 }
 
 /// Checks if a command exists in the PATH.
@@ -238,7 +275,7 @@ fn run_deadnix_fix(verbose_count: u8) -> Result<(CheckStatus, u32)> {
 ///
 /// * `Result<LintSummary>` - A summary of the lint operation.
 pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSummary> {
-    info!("🧹 Running Linters and Formatters (Attempting Fixes)...");
+    info!("{} {}", Symbols::cleanup(), Colors::info("Running Linters and Formatters (Attempting Fixes)..."));
     
     let mut summary = LintSummary::default();
     let mut outcome = LintOutcome::Passed;
@@ -263,7 +300,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     
     if let Some(fmt_cmd) = formatter {
         let check_name = format!("Format ({})", fmt_cmd);
-        info!("-> Running {}", check_name);
+        info!("{} Running {}", Symbols::info(), Colors::info(check_name.clone()));
         
         // Run formatter fix
         match run_formatter_fix(fmt_cmd, &nix_file_args, verbose_count) {
@@ -272,7 +309,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
                 summary.details.insert(check_name.clone(), status);
             }
             Err(e) => {
-                error!("Formatter failed: {}", e);
+                error!("{} Formatter failed: {}", Symbols::error(), e);
                 summary.details.insert(check_name.clone(), CheckStatus::Failed);
                 if strict_mode {
                     outcome = LintOutcome::CriticalFailure(format!("Formatter {} failed", fmt_cmd));
@@ -281,12 +318,16 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
         }
     } else {
         summary.details.insert("Format".to_string(), CheckStatus::Skipped);
-        warn!("No Nix formatter found. Consider installing alejandra, nixpkgs-fmt, or nixfmt.");
+        warn!("{} No Nix formatter found. Consider installing {}, {}, or {}.",
+            Symbols::warning(),
+            Colors::code("alejandra"),
+            Colors::code("nixpkgs-fmt"),
+            Colors::code("nixfmt"));
     }
     
     // --- Statix ---
     if command_exists("statix") {
-        info!("-> Running Statix");
+        info!("{} Running {}", Symbols::info(), Colors::info("Statix"));
         
         // Run statix fix
         match run_statix_fix(verbose_count) {
@@ -295,7 +336,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
                 summary.details.insert("Statix Fix".to_string(), status);
             }
             Err(e) => {
-                error!("Statix failed: {}", e);
+                error!("{} Statix failed: {}", Symbols::error(), e);
                 summary.details.insert("Statix Fix".to_string(), CheckStatus::Failed);
                 if strict_mode {
                     outcome = LintOutcome::CriticalFailure("Statix fix failed".to_string());
@@ -304,12 +345,12 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
         }
     } else {
         summary.details.insert("Statix".to_string(), CheckStatus::Skipped);
-        debug!("Statix not found. Consider installing statix for better linting.");
+        debug!("Statix not found. Consider installing {} for better linting.", Colors::code("statix"));
     }
     
     // --- Deadnix ---
     if command_exists("deadnix") {
-        info!("-> Running Deadnix");
+        info!("{} Running {}", Symbols::info(), Colors::info("Deadnix"));
         
         // Run deadnix fix
         match run_deadnix_fix(verbose_count) {
@@ -318,7 +359,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
                 summary.details.insert("Deadnix Fix".to_string(), status);
             }
             Err(e) => {
-                error!("Deadnix failed: {}", e);
+                error!("{} Deadnix failed: {}", Symbols::error(), e);
                 summary.details.insert("Deadnix Fix".to_string(), CheckStatus::Failed);
                 if strict_mode {
                     outcome = LintOutcome::CriticalFailure("Deadnix fix failed".to_string());
@@ -327,7 +368,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
         }
     } else {
         summary.details.insert("Deadnix".to_string(), CheckStatus::Skipped);
-        debug!("Deadnix not found. Consider installing deadnix to detect unused code.");
+        debug!("Deadnix not found. Consider installing {} to detect unused code.", Colors::code("deadnix"));
     }
     
     // Update final outcome
@@ -335,9 +376,78 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     
     // Create summary message
     summary.message = format!(
-        "Lint phase completed. {} files formatted, {} fixes applied (approx).",
-        summary.files_formatted, summary.fixes_applied
+        "{} Lint phase completed. {} files formatted, {} fixes applied (approx).",
+        Symbols::success_check(),
+        Colors::emphasis(summary.files_formatted),
+        Colors::emphasis(summary.fixes_applied)
     );
     
+    // Display the results as a table
+    if let Err(e) = summary.display_as_table() {
+        debug!("Failed to display lint results as table: {}", e);
+    }
+    
     Ok(summary)
+}
+
+/// Format lint results as a table string
+pub fn format_lint_results_table(summary: &LintSummary) -> String {
+    use cli_table::{Table, format::Justify};
+    
+    #[derive(Table)]
+    struct LintResultRow {
+        #[table(title = "Linter")]
+        linter: String,
+        #[table(title = "Status", justify = "Justify::Center")]
+        status: String,
+        #[table(title = "Details")]
+        details: String,
+    }
+    
+    let mut rows = Vec::new();
+    
+    for (check_name, status) in &summary.details {
+        let status_str = match status {
+            CheckStatus::Passed => "Passed",
+            CheckStatus::Failed => "Failed",
+            CheckStatus::Skipped => "Skipped",
+            CheckStatus::Warnings => "Warnings",
+        };
+        
+        let details = match status {
+            CheckStatus::Passed => "No issues found",
+            CheckStatus::Failed => "See error output above for details",
+            CheckStatus::Skipped => "Tool not installed or check disabled",
+            CheckStatus::Warnings => "Completed with warnings",
+        };
+        
+        rows.push(LintResultRow {
+            linter: check_name.clone(),
+            status: status_str.to_string(),
+            details: details.to_string(),
+        });
+    }
+    
+    // Sort rows by linter name for consistent output
+    rows.sort_by(|a, b| a.linter.cmp(&b.linter));
+    
+    // Since we can't easily convert the table to a string directly,
+    // we'll just return a simple formatted string representation
+    let mut output = String::new();
+    
+    // Add header
+    output.push_str("+--------------------+--------+----------------------------+\n");
+    output.push_str("| Linter             | Status | Details                    |\n");
+    output.push_str("+--------------------+--------+----------------------------+\n");
+    
+    // Add rows
+    for row in rows {
+        output.push_str(&format!("| {:<18} | {:<6} | {:<26} |\n",
+            row.linter, row.status, row.details));
+    }
+    
+    // Add footer
+    output.push_str("+--------------------+--------+----------------------------+\n");
+    
+    output
 }

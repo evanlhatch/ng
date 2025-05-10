@@ -5,6 +5,7 @@ use std::{
     time::SystemTime,
 };
 
+use cli_table::{print_stdout, Cell, Table};
 use color_eyre::eyre::{bail, eyre, Context, ContextCompat};
 use nix::errno::Errno;
 use nix::{
@@ -167,6 +168,54 @@ impl interface::CleanMode {
         println!("{}", "Welcome to nh clean".bold());
         println!("Keeping {} generation(s)", args.keep.green());
         println!("Keeping paths newer than {}", args.keep_since.green());
+        
+        // Show which cleanup steps will be performed in a table format
+        println!();
+        println!("{}", "Cleanup steps:".bold());
+        
+        // Create a table to display cleanup steps
+        let mut table = vec![];
+        
+        // Add rows for each cleanup step
+        table.push(vec![
+            "🗑️ Remove old generations".cell(),
+            "Yes".cell().foreground_color(Some(cli_table::Color::Green)),
+        ]);
+        
+        table.push(vec![
+            "🧹 Run garbage collection".cell(),
+            if args.nogc {
+                "No".cell().foreground_color(Some(cli_table::Color::Red))
+            } else {
+                "Yes".cell().foreground_color(Some(cli_table::Color::Green))
+            },
+        ]);
+        
+        table.push(vec![
+            "⚡ Optimize nix store".cell(),
+            if args.nooptimise {
+                "No".cell().foreground_color(Some(cli_table::Color::Red))
+            } else {
+                "Yes".cell().foreground_color(Some(cli_table::Color::Green))
+            },
+        ]);
+        
+        // Display the table
+        let table = table.table()
+            .title(vec![
+                "Step".cell().bold(true),
+                "Enabled".cell().bold(true),
+            ])
+            .bold(true);
+        
+        if let Err(e) = cli_table::print_stdout(table) {
+            debug!("Failed to display cleanup steps as table: {}", e);
+            // Fallback to simple text if table display fails
+            println!("- 🗑️ Remove old generations: {}", "Yes".green());
+            println!("- 🧹 Run garbage collection: {}", if args.nogc { "No".red() } else { "Yes".green() });
+            println!("- ⚡ Optimize nix store: {}", if args.nooptimise { "No".red() } else { "Yes".green() });
+        }
+        
         println!();
         println!("legend:");
         println!("{}: path to be kept", "OK".green());
@@ -227,12 +276,51 @@ impl interface::CleanMode {
             }
         }
 
+        // Check if we're running as root
+        let uid = nix::unistd::Uid::effective();
+        let is_root = uid.is_root();
+
+        // Multi-step cleanup process with loading indicators
         if !args.nogc {
-            Command::new("nix")
-                .args(["store", "gc"])
-                .dry(args.dry)
-                .message("Performing garbage collection on the nix store")
-                .run()?;
+            // Start a spinner for the GC step with emoji icon
+            let gc_spinner = crate::progress::start_spinner("[🧹 GC] Performing garbage collection on the nix store");
+            
+            // Run the GC command with sudo if not root
+            if is_root {
+                Command::new("nix-store")
+                    .args(["--gc"])
+                    .dry(args.dry)
+                    .run()?;
+            } else {
+                Command::new("sudo")
+                    .args(["nix-store", "--gc"])
+                    .dry(args.dry)
+                    .run()?;
+            }
+            
+            // Finish the spinner with success
+            crate::progress::finish_spinner_success(&gc_spinner, "[✅ GC] Garbage collection completed successfully");
+        }
+
+        if !args.nooptimise {
+            // Start a spinner for the optimize step with emoji icon
+            let optimize_spinner = crate::progress::start_spinner("[⚡ Optimize] Optimizing Nix store");
+            
+            // Run the optimize command with sudo if not root
+            if is_root {
+                Command::new("nix-store")
+                    .args(["--optimise"])
+                    .dry(args.dry)
+                    .run()?;
+            } else {
+                Command::new("sudo")
+                    .args(["nix-store", "--optimise"])
+                    .dry(args.dry)
+                    .run()?;
+            }
+            
+            // Finish the spinner with success
+            crate::progress::finish_spinner_success(&optimize_spinner, "[✅ Optimize] Store optimization completed successfully");
         }
 
         Ok(())

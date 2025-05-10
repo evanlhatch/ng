@@ -44,7 +44,12 @@ mod tests {
     fn test_is_git_repo() {
         // Test with a temporary Git repository
         let temp_dir = setup_git_repo();
-        let current_dir = std::env::current_dir().unwrap();
+        
+        // Save the current directory path as a string to avoid potential issues
+        let current_dir_str = std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(String::from))
+            .unwrap_or_else(|| String::from("."));
         
         // Change to the temporary directory
         std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -52,8 +57,8 @@ mod tests {
         // Test is_git_repo
         assert!(is_git_repo());
         
-        // Change back to the original directory
-        std::env::set_current_dir(&current_dir).unwrap();
+        // Try to change back to the original directory, but don't panic if it fails
+        let _ = std::env::set_current_dir(Path::new(&current_dir_str));
         
         // Test with a non-Git directory
         let temp_dir = TempDir::new().unwrap();
@@ -61,8 +66,8 @@ mod tests {
         
         assert!(!is_git_repo());
         
-        // Change back to the original directory
-        std::env::set_current_dir(&current_dir).unwrap();
+        // Try to change back to the original directory, but don't panic if it fails
+        let _ = std::env::set_current_dir(Path::new(&current_dir_str));
     }
 
     #[test]
@@ -75,7 +80,12 @@ mod tests {
     fn test_run_git_check_warning_only() {
         // Test with a temporary Git repository
         let temp_dir = setup_git_repo();
-        let current_dir = std::env::current_dir().unwrap();
+        
+        // Save the current directory path as a string to avoid potential issues
+        let current_dir_str = std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(String::from))
+            .unwrap_or_else(|| String::from("."));
         
         // Change to the temporary directory
         std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -87,7 +97,7 @@ mod tests {
         let result = run_git_check_warning_only();
         assert!(result.is_ok());
         
-        // Change back to the original directory
-        std::env::set_current_dir(&current_dir).unwrap();
+        // Try to change back to the original directory, but don't panic if it fails
+        let _ = std::env::set_current_dir(Path::new(&current_dir_str));
     }
 }

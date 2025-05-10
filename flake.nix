@@ -34,5 +34,26 @@
       });
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
+      
+      # Add a simple test NixOS configuration
+      nixosConfigurations = {
+        test = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ({ pkgs, ... }: {
+              system.stateVersion = "24.11";
+              boot.loader.systemd-boot.enable = true;
+              boot.loader.efi.canTouchEfiVariables = true;
+              networking.hostName = "test";
+              
+              # Add a root filesystem configuration
+              fileSystems."/" = {
+                device = "/dev/disk/by-label/nixos";
+                fsType = "ext4";
+              };
+            })
+          ];
+        };
+      };
     };
 }
