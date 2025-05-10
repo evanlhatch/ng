@@ -1,4 +1,4 @@
-`11`1````1````1use crate::util::{add_verbosity_flags, run_cmd};
+use crate::util::{add_verbosity_flags, run_cmd};
 use crate::ui_style::{Colors, Symbols};
 use color_eyre::eyre::{Context, Result};
 use std::collections::HashMap;

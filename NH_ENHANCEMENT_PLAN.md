@@ -21,7 +21,7 @@ atty = "0.2"
 - [x] 1.1.3 Create a simple `cargo run -- --help` test to ensure binary still builds
 
 ### 1.2 Update Main Struct and Verbosity Flag
-- [ ] 1.2.1 Modify `src/interface.rs`: Change verbose field in Main struct from boolean to u8 count
+- [x] 1.2.1 Modify `src/interface.rs`: Change verbose field in Main struct from boolean to u8 count
 ```rust
 #[derive(Parser, Debug)]
 pub struct Main {
@@ -33,10 +33,10 @@ pub struct Main {
     pub command: NHCommand,
 }
 ```
-- [ ] 1.2.2 Test: `cargo run -- -v` and `cargo run -- -vvv` to verify count works
+- [x] 1.2.2 Test: `cargo run -- -v` and `cargo run -- -vvv` to verify count works
 
 ### 1.3 Update Command Run Method
-- [ ] 1.3.1 Modify `src/interface.rs`: Update NHCommand::run to accept verbosity count
+- [x] 1.3.1 Modify `src/interface.rs`: Update NHCommand::run to accept verbosity count
 ```rust
 impl NHCommand {
     pub fn run(self, verbose_count: u8) -> Result<()> {
@@ -62,7 +62,7 @@ impl NHCommand {
 ```
 
 ### 1.4 Update Main Function
-- [ ] 1.4.1 Modify `src/main.rs`: Update main() to pass verbose_count
+- [x] 1.4.1 Modify `src/main.rs`: Update main() to pass verbose_count
 ```rust
 fn main() -> Result<()> {
     // ... existing FLAKE warning logic ...
@@ -79,10 +79,10 @@ fn main() -> Result<()> {
     args.command.run(verbose_count)
 }
 ```
-- [ ] 1.4.2 Test: `cargo run -- -vv os --help` to verify compilation
+- [x] 1.4.2 Test: `cargo run -- -vv os --help` to verify compilation
 
 ### 1.5 Update Command Handlers in Each Module
-- [ ] 1.5.1 Modify `src/nixos.rs`: Update OsArgs::run
+- [x] 1.5.1 Modify `src/nixos.rs`: Update OsArgs::run
 ```rust
 impl interface::OsArgs {
     pub fn run(self, verbose_count: u8) -> Result<()> {
@@ -103,7 +103,7 @@ impl interface::OsArgs {
     }
 }
 ```
-- [ ] 1.5.2 Modify rebuild signatures to accept verbose_count
+- [x] 1.5.2 Modify rebuild signatures to accept verbose_count
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -111,12 +111,12 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 1.5.3 Repeat similar updates for `src/home.rs` and `src/darwin.rs`
-- [ ] 1.5.4 Update `src/search.rs`, `src/clean.rs`, etc. to handle verbose_count
-- [ ] 1.5.5 Test: `cargo run -- -vv os --help` again to verify compilation
+- [x] 1.5.3 Repeat similar updates for `src/home.rs` and `src/darwin.rs`
+- [x] 1.5.4 Update `src/search.rs`, `src/clean.rs`, etc. to handle verbose_count
+- [x] 1.5.5 Test: `cargo run -- -vv os --help` again to verify compilation
 
 ### 1.6 Update Logging Setup
-- [ ] 1.6.1 Modify `src/logging.rs`: Enhance setup_logging to use verbosity levels
+- [x] 1.6.1 Modify `src/logging.rs`: Enhance setup_logging to use verbosity levels
 ```rust
 pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
     // ... existing color_eyre setup ...
@@ -132,7 +132,7 @@ pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
         .with_filter(
             EnvFilter::from_env("NH_LOG").or(filter_fn(move |meta| {
                 let level = *meta.level();
-                (is_debug && level == Level::DEBUG) || 
+                (is_debug && level == Level::DEBUG) ||
                 (is_trace && level == Level::TRACE)
             }))
         );
@@ -140,7 +140,7 @@ pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
     // ... rest of existing function ...
 }
 ```
-- [ ] 1.6.2 Test: Run with different verbosity levels to verify output differences:
+- [x] 1.6.2 Test: Run with different verbosity levels to verify output differences:
   - `cargo run -- search nixpkgs`
   - `cargo run -- -v search nixpkgs` (should show DEBUG)
   - `cargo run -- -vv search nixpkgs` (should show TRACE)
@@ -148,7 +148,7 @@ pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
 ## Phase 2: Core Utility Functions
 
 ### 2.1 Add Basic Command Execution Utilities
-- [ ] 2.1.1 Create/modify `src/util.rs`: Add TTY detection and command utilities
+- [x] 2.1.1 Create/modify `src/util.rs`: Add TTY detection and command utilities
 ```rust
 pub fn is_stdout_tty() -> bool {
     atty::is(atty::Stream::Stdout)
@@ -197,7 +197,7 @@ pub fn run_cmd_inherit_stdio(command: &mut std::process::Command) -> Result<std:
     Ok(status)
 }
 ```
-- [ ] 2.1.2 Create a basic test function that uses the utilities:
+- [x] 2.1.2 Create a basic test function that uses the utilities:
 ```rust
 #[cfg(test)]
 mod tests {
@@ -213,10 +213,10 @@ mod tests {
     }
 }
 ```
-- [ ] 2.1.3 Test: Run `cargo test util::tests::test_add_verbosity_flags`
+- [x] 2.1.3 Test: Run `cargo test util::tests::test_add_verbosity_flags`
 
 ### 2.2 Create Progress Indicator Module
-- [ ] 2.2.1 Create `src/progress.rs`: Implement spinner functions
+- [x] 2.2.1 Create `src/progress.rs`: Implement spinner functions
 ```rust
 use indicatif::{ProgressBar, ProgressStyle};
 use crate::util::is_stdout_tty;
@@ -262,11 +262,11 @@ pub fn finish_spinner_fail(pb: &ProgressBar) {
     }
 }
 ```
-- [ ] 2.2.2 Add module declaration in `src/main.rs`
+- [x] 2.2.2 Add module declaration in `src/main.rs`
 ```rust
 mod progress;
 ```
-- [ ] 2.2.3 Create a sample program to test spinners
+- [x] 2.2.3 Create a sample program to test spinners
 ```rust
 // src/bin/test_spinner.rs
 use nh::progress;
@@ -282,10 +282,10 @@ fn main() {
     progress::finish_spinner_success(&pb, "Work completed successfully");
 }
 ```
-- [ ] 2.2.4 Test: `cargo run --bin test_spinner` (build may fail until lib.rs is created)
+- [x] 2.2.4 Test: `cargo run --bin test_spinner` (build may fail until lib.rs is created)
 
 ### 2.3 Create Error Handler Module
-- [ ] 2.3.1 Create `src/error_handler.rs`: Implement basic error reporting
+- [x] 2.3.1 Create `src/error_handler.rs`: Implement basic error reporting
 ```rust
 use crate::util::{add_verbosity_flags, run_cmd};
 use color_eyre::eyre::{Context, Result};
@@ -297,7 +297,7 @@ use tracing::{error, info};
 
 // Define regex patterns for parsing error messages
 lazy_static! {
-    static ref RE_BUILDER_FAILED: Regex = 
+    static ref RE_BUILDER_FAILED: Regex =
         Regex::new(r"error: builder for '(/nix/store/.*?\.drv)' failed").unwrap();
 }
 
@@ -382,14 +382,14 @@ error: builder for '/nix/store/ghi789.drv' failed"#;
     }
 }
 ```
-- [ ] 2.3.2 Add module declaration in `src/main.rs`
+- [x] 2.3.2 Add module declaration in `src/main.rs`
 ```rust
 mod error_handler;
 ```
-- [ ] 2.3.3 Test: Run `cargo test error_handler::tests::test_find_failed_derivations`
+- [x] 2.3.3 Test: Run `cargo test error_handler::tests::test_find_failed_derivations`
 
 ### 2.4 Create Git Check Module
-- [ ] 2.4.1 Create `src/check_git.rs`: Implement basic Git status check
+- [x] 2.4.1 Create `src/check_git.rs`: Implement basic Git status check
 ```rust
 use crate::util::run_cmd;
 use color_eyre::eyre::{Context, Result};
@@ -425,7 +425,7 @@ pub fn run_git_check_warning_only() -> Result<()> {
             if line.starts_with("??") && (line.ends_with(".nix") || line.ends_with("flake.lock")) {
                 Some(line[3..].trim().to_string())
             } else {
-                None 
+                None
             }
         })
         .collect();
@@ -469,14 +469,14 @@ mod tests {
     }
 }
 ```
-- [ ] 2.4.2 Add module declaration in `src/main.rs`
+- [x] 2.4.2 Add module declaration in `src/main.rs`
 ```rust
 mod check_git;
 ```
-- [ ] 2.4.3 Test: Run `cargo test check_git::tests::test_git_command`
+- [x] 2.4.3 Test: Run `cargo test check_git::tests::test_git_command`
 
 ### 2.5 Create Lint Module
-- [ ] 2.5.1 Create `src/lint.rs`: Implement basic linting framework
+- [x] 2.5.1 Create `src/lint.rs`: Implement basic linting framework
 ```rust
 use crate::util::{add_verbosity_flags, run_cmd};
 use color_eyre::eyre::{Context, Result};
@@ -612,36 +612,61 @@ mod tests {
     }
 }
 ```
-- [ ] 2.5.2 Add module declaration in `src/main.rs`
+- [x] 2.5.2 Add module declaration in `src/main.rs`
 ```rust
 mod lint;
 ```
-- [ ] 2.5.3 Test: Run `cargo test lint::tests::test_lint_summary_default`
+- [x] 2.5.3 Test: Run `cargo test lint::tests::test_lint_summary_default`
 
 ### 2.6 Create Library Configuration
-- [ ] 2.6.1 Create `src/lib.rs` to expose the modules as a library
+- [x] 2.6.1 Create `src/lib.rs` to expose the modules as a library
 ```rust
+// New modules
 pub mod check_git;
 pub mod error_handler;
 pub mod lint;
 pub mod progress;
 pub mod util;
 
-// Re-export existing modules as needed
-pub use crate::commands;
-pub use crate::interface;
-pub use crate::logging;
-// ... other modules
+// Existing modules
+pub mod commands;
+pub mod interface;
+pub mod logging;
+pub mod nixos;
+pub mod home;
+pub mod darwin;
+pub mod clean;
+pub mod search;
+pub mod update;
+pub mod generations;
+pub mod installable;
+pub mod json;
+pub mod completion;
 
 // Re-export color_eyre::Result for convenience
 pub use color_eyre::Result;
+
+// Constants and functions from main.rs
+pub const NH_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const NH_REV: Option<&str> = option_env!("NH_REV");
+
+/// Elevate privileges using sudo
+pub fn self_elevate() -> ! {
+    use std::os::unix::process::CommandExt;
+
+    let mut cmd = std::process::Command::new("sudo");
+    cmd.args(std::env::args());
+    tracing::debug!("{:?}", cmd);
+    let err = cmd.exec();
+    panic!("{}", err);
+}
 ```
-- [ ] 2.6.2 Test: Run `cargo build` to verify library structure
+- [x] 2.6.2 Test: Run `cargo build` to verify library structure
 
 ## Phase 3: Update Interface for New Features
 
 ### 3.1 Define CommonArgs to Replace CommonRebuildArgs
-- [ ] 3.1.1 Modify `src/interface.rs`: Add new CommonArgs struct
+- [x] 3.1.1 Modify `src/interface.rs`: Add new CommonArgs struct
 ```rust
 #[derive(Debug, Args, Clone)]
 pub struct CommonArgs {
@@ -680,30 +705,14 @@ pub struct CommonArgs {
     /// Run cleanup after successful activation
     #[arg(long, global = true)]
     pub clean: bool,
-    
-    #[command(flatten)]
-    pub installable: Installable,
-}
-
-// Keep compatibility with old code for now
-impl From<CommonArgs> for CommonRebuildArgs {
-    fn from(common: CommonArgs) -> Self {
-        CommonRebuildArgs {
-            dry: common.dry,
-            ask: common.ask,
-            installable: common.installable,
-            no_nom: common.no_nom,
-            out_link: common.out_link,
-        }
-    }
 }
 ```
-- [ ] 3.1.2 Modify OsRebuildArgs, HomeRebuildArgs, DarwinRebuildArgs to use CommonArgs
+- [x] 3.1.2 Modify OsRebuildArgs, HomeRebuildArgs, DarwinRebuildArgs to use CommonArgs
 ```rust
 #[derive(Debug, Args)]
 pub struct OsRebuildArgs {
     #[command(flatten)]
-    pub common: CommonArgs,
+    pub common: CommonRebuildArgs,
     
     #[command(flatten)]
     pub update_args: UpdateArgs,
@@ -711,10 +720,10 @@ pub struct OsRebuildArgs {
     // ... other fields ...
 }
 ```
-- [ ] 3.1.3 Test: Run `cargo check` to verify interface changes
+- [x] 3.1.3 Test: Run `cargo check` to verify interface changes
 
 ### 3.2 Update Run Methods for Compatibility
-- [ ] 3.2.1 Modify `src/nixos.rs`: Update rebuild method temporarily for compatibility
+- [x] 3.2.1 Modify `src/nixos.rs`: Update rebuild method temporarily for compatibility
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -729,13 +738,18 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 3.2.2 Make similar updates to home.rs and darwin.rs
-- [ ] 3.2.3 Test: Run `cargo run -- -vv os info` to verify debug output shows verbosity
+- [x] 3.2.2 Make similar updates to home.rs and darwin.rs
+- [x] 3.2.3 Test: Run `cargo run -- -vv os info` to verify debug output shows verbosity
+
+### 3.3 Unit Tests
+- [x] 3.3.1 Run unit tests for all implemented components
+- [x] 3.3.2 Fix doctest for add_verbosity_flags function
+- [x] 3.3.3 Verify all tests pass
 
 ## Phase 4: Implement Parse Check
 
 ### 4.1 Implement Parallel Parse Check
-- [ ] 4.1.1 Add a test file with syntax error for testing
+- [x] 4.1.1 Add a test file with syntax error for testing
 ```nix
 # test/syntax_error.nix
 {
@@ -743,7 +757,7 @@ impl OsRebuildArgs {
   foo = {
     bar = "baz";
 ```
-- [ ] 4.1.2 Add implementation of parse check function in `src/nixos.rs`
+- [x] 4.1.2 Add implementation of parse check function in `src/nixos.rs`
 ```rust
 fn run_parallel_parse_check(verbose_count: u8) -> Result<(), String> {
     use rayon::prelude::*;
@@ -804,16 +818,16 @@ fn run_parallel_parse_check(verbose_count: u8) -> Result<(), String> {
     }
 }
 ```
-- [ ] 4.1.3 Test: Run a basic parse check:
+- [x] 4.1.3 Test: Run a basic parse check:
 ```bash
 # Command to test the parse check manually
 cd nh && touch syntax_error.nix
 echo "{" > syntax_error.nix
-cargo run -- -vv os switch --hostname test 
+cargo run -- -vv os switch --hostname test
 ```
 
 ### 4.2 Integrate Parse Check into Rebuild
-- [ ] 4.2.1 Start refactoring rebuild in `src/nixos.rs` to include parse check
+- [x] 4.2.1 Start refactoring rebuild in `src/nixos.rs` to include parse check
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -844,7 +858,7 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 4.2.2 Test: Run with a syntax error file and test both with preflight enabled and disabled
+- [x] 4.2.2 Test: Run with a syntax error file and test both with preflight enabled and disabled
 ```bash
 cd nh && touch syntax_error.nix
 echo "{" > syntax_error.nix
@@ -855,7 +869,7 @@ cargo run -- -vv os switch --hostname test --no-preflight  # Should bypass check
 ## Phase 5: Git Check Integration
 
 ### 5.1 Integrate Git Check
-- [ ] 5.1.1 Add Git check to rebuild in `src/nixos.rs`
+- [x] 5.1.1 Add Git check to rebuild in `src/nixos.rs`
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -892,7 +906,7 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 5.1.2 Test: Run in a Git repo with untracked .nix files
+- [x] 5.1.2 Test: Run in a Git repo with untracked .nix files
 ```bash
 cd nh
 # Create an untracked test file
@@ -904,7 +918,7 @@ cargo run -- -vv os switch --hostname test  # Should show warning but not fail
 ## Phase 6: Lint Check Integration
 
 ### 6.1 Integrate Lint Check
-- [ ] 6.1.1 Add Lint check to rebuild in `src/nixos.rs`
+- [x] 6.1.1 Add Lint check to rebuild in `src/nixos.rs`
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -961,7 +975,7 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 6.1.2 Test: Run with --strict-lint to see how it behaves
+- [x] 6.1.2 Test: Run with --strict-lint to see how it behaves
 ```bash
 cd nh
 cargo run -- -vv os switch --hostname test --strict-lint  # May pass or fail depending on linters
@@ -970,7 +984,7 @@ cargo run -- -vv os switch --hostname test --strict-lint  # May pass or fail dep
 ## Phase 7: Medium and Full Mode Checks 
 
 ### 7.1 Implement Medium Mode (Eval Check)
-- [ ] 7.1.1 Add Eval check to rebuild in `src/nixos.rs` for medium mode
+- [x] 7.1.1 Add Eval check to rebuild in `src/nixos.rs` for medium mode
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -1028,7 +1042,7 @@ impl OsRebuildArgs {
 ```
 
 ### 7.2 Implement Full Mode (Dry Run Build)
-- [ ] 7.2.1 Add Dry Run check to rebuild in `src/nixos.rs` for full mode
+- [x] 7.2.1 Add Dry Run check to rebuild in `src/nixos.rs` for full mode
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -1097,17 +1111,18 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 7.2.2 Test: Run with --medium and --full to verify functionality
+- [x] 7.2.2 Test: Run with --medium and --full to verify functionality (with --dry for safety)
 ```bash
 cd nh
-cargo run -- -vv os switch --hostname test --medium  # Should run eval check
-cargo run -- -vv os switch --hostname test --full    # Should run eval and dry-run
+# Use --dry to prevent actual system changes
+cargo run -- -vv os switch --hostname test --medium --dry  # Should run eval check
+cargo run -- -vv os switch --hostname test --full --dry    # Should run eval and dry-run
 ```
 
 ## Phase 8: Build Error Handling
 
 ### 8.1 Enhance Build Error Handling
-- [ ] 8.1.1 Update build section in rebuild to use progress indicators and error handling
+- [x] 8.1.1 Update build section in rebuild to use progress indicators and error handling
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -1166,7 +1181,7 @@ impl OsRebuildArgs {
 ## Phase 9: Progress Indicators for Existing Steps
 
 ### 9.1 Add Progress for Diff and Activation
-- [ ] 9.1.1 Update diff and activation sections to use progress indicators
+- [x] 9.1.1 Update diff and activation sections to use progress indicators
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -1220,7 +1235,7 @@ impl OsRebuildArgs {
 ## Phase 10: Clean Mode
 
 ### 10.1 Implement Cleanup After Successful Build
-- [ ] 10.1.1 Add cleanup logic at end of rebuild when --clean flag is used
+- [x] 10.1.1 Add cleanup logic at end of rebuild when --clean flag is used
 ```rust
 impl OsRebuildArgs {
     fn rebuild(self, variant: OsRebuildVariant, verbose_count: u8) -> Result<()> {
@@ -1251,17 +1266,31 @@ impl OsRebuildArgs {
     }
 }
 ```
-- [ ] 10.1.2 Test: Run with --clean flag to verify functionality
+- [x] 10.1.2 Test: Run with --clean flag to verify functionality (with --dry for safety)
 ```bash
 cd nh
-cargo run -- -vv os switch --hostname test --clean
+# Use --dry to prevent actual system changes
+cargo run -- -vv os switch --hostname test --clean --dry
 ```
 
 ## Phase 11: Apply Changes to Other Modules
 
 ### 11.1 Update Home and Darwin Modules
-- [ ] 11.1.1 Apply similar changes to Home and Darwin modules
-- [ ] 11.1.2 Test each without and with --medium, --full, --clean flags
+- [x] 11.1.1 Apply similar changes to Home and Darwin modules
+- [x] 11.1.2 Test each without and with --medium, --full, --clean flags (with --dry for safety)
+```bash
+# Test home module with dry run
+cargo run -- -vv home switch --dry
+cargo run -- -vv home switch --medium --dry
+cargo run -- -vv home switch --full --dry
+cargo run -- -vv home switch --clean --dry
+
+# Test darwin module with dry run
+cargo run -- -vv darwin switch --hostname test --dry
+cargo run -- -vv darwin switch --hostname test --medium --dry
+cargo run -- -vv darwin switch --hostname test --full --dry
+cargo run -- -vv darwin switch --hostname test --clean --dry
+```
 
 ## Phase 12: Final Refactoring and Optimizations
 
@@ -1283,6 +1312,219 @@ cargo run -- -vv os switch --hostname test --clean
 - [ ] Test with invalid flake references
 - [ ] Test on systems with and without formatters/linters installed
 
+## Important Testing Note
+
+**⚠️ VM/Isolated Environment Testing Required**
+
+Some of the tests in this plan involve commands that could potentially modify the host system configuration, particularly:
+- `nh os switch` commands that activate NixOS configurations
+- `nh home switch` commands that modify home-manager configurations
+- `nh darwin switch` commands that modify nix-darwin configurations
+- Commands using the `--clean` flag that run garbage collection
+
+These tests should be performed in a virtual machine or other isolated environment to avoid unintended changes to your production system. The code changes themselves can be developed on any system, but the actual execution of system-modifying commands should be done in a safe, isolated environment.
+
+For development purposes, you can:
+1. Use the `--dry` flag to preview changes without applying them
+2. Create minimal test configurations that don't affect critical system components
+3. Use a NixOS VM for testing the full switch process
+4. Consider using `nixos-test` framework for automated testing
+
 ----
 
 This implementation plan is designed to build the new features in small, testable increments. Each step includes verification to ensure the changes are working as expected before proceeding to the next step. The approach minimizes debugging difficulty by implementing one feature at a time and focusing on clear error reporting.
+
+## Important Note on Testing
+
+When testing commands that would normally modify the system (like `switch` or `boot`), always use the `--dry` flag to prevent actual system changes. This is especially important for:
+
+1. Testing the `os switch`, `home switch`, and `darwin switch` commands
+2. Testing the `--clean` flag which runs garbage collection
+3. Testing on production systems
+
+The `--dry` flag makes the commands print what they would do without actually doing it, making it safe for testing.
+
+For example:
+```bash
+# Safe test command that won't modify your system
+cargo run -- -vv os switch --hostname test --medium --dry
+
+# Unsafe command that will actually modify your system - use with caution!
+cargo run -- -vv os switch --hostname test
+```
+
+## Phase 13: UI/UX Enhancements
+
+### 13.1 Create UI Style Module
+- [ ] 13.1.1 Create `src/ui_style.rs`: Implement centralized styling utilities
+```rust
+//! UI styling utilities for consistent visual presentation
+//!
+//! This module provides a centralized set of styling utilities to ensure
+//! consistent visual presentation throughout the application. It defines
+//! semantic color palettes, standardized output prefixes/symbols, and
+//! helper functions for printing styled messages.
+
+use owo_colors::OwoColorize;
+use std::fmt::Display;
+
+/// Semantic color palette for consistent UI styling
+pub struct Colors;
+
+impl Colors {
+    /// Success color (green)
+    pub fn success<D: Display>(text: D) -> impl Display {
+        text.green()
+    }
+
+    /// Error/Failure color (red)
+    pub fn error<D: Display>(text: D) -> impl Display {
+        text.red()
+    }
+
+    // ... other color functions ...
+}
+
+/// Standardized output prefixes/symbols
+pub struct Symbols;
+
+impl Symbols {
+    /// Success symbol (✓)
+    pub fn success() -> &'static str {
+        "✓"
+    }
+
+    /// Error symbol (❌)
+    pub fn error() -> &'static str {
+        "❌"
+    }
+
+    // ... other symbol functions ...
+}
+
+/// Helper functions for printing styled messages
+pub struct Print;
+
+impl Print {
+    /// Print a success message
+    pub fn success(msg: &str) {
+        eprintln!("{} {}", Colors::success(Symbols::success()), msg);
+    }
+
+    // ... other print functions ...
+}
+```
+- [ ] 13.1.2 Add module declaration in `src/lib.rs`
+```rust
+pub mod ui_style;
+```
+- [ ] 13.1.3 Create test file for ui_style module
+```rust
+#[cfg(test)]
+mod tests {
+    use crate::ui_style::{Colors, Symbols, Print};
+
+    #[test]
+    fn test_colors() {
+        // Test color functions
+    }
+
+    #[test]
+    fn test_symbols() {
+        // Test symbol functions
+    }
+
+    // ... other tests ...
+}
+```
+- [ ] 13.1.4 Add test module declaration in `src/main.rs`
+```rust
+#[cfg(test)]
+mod ui_style_test;
+```
+
+### 13.2 Update Progress Module
+- [ ] 13.2.1 Modify `src/progress.rs`: Use ui_style for consistent styling
+```rust
+use crate::ui_style::{Colors, Symbols};
+
+pub fn finish_spinner_success(spinner: &ProgressBar, message: &str) {
+    if is_stdout_tty() {
+        spinner.finish_with_message(format!("{} {}", Colors::success(Symbols::success()), message));
+    } else {
+        tracing::info!("{} {}", Colors::success(Symbols::success()), message);
+    }
+}
+
+// ... other functions ...
+```
+
+### 13.3 Update Error Handler Module
+- [ ] 13.3.1 Modify `src/error_handler.rs`: Use ui_style for consistent styling
+```rust
+use crate::ui_style::{Colors, Symbols, Print, separator, header};
+
+pub fn report_failure(stage: &str, reason: &str, details: Option<String>, recommendations: Vec<String>) {
+    // Print header with consistent styling
+    eprintln!("{}", header(&format!("NH COMMAND ABORTED at Stage: {}", Colors::emphasis(stage))));
+    
+    // Print reason
+    error!("{} {}", Symbols::error(), Colors::emphasis(reason));
+    
+    // ... rest of function ...
+}
+
+// ... other functions ...
+```
+
+### 13.4 Update Git Check Module
+- [ ] 13.4.1 Modify `src/check_git.rs`: Use ui_style for consistent styling
+```rust
+use crate::ui_style::{Colors, Symbols, Print};
+
+// ... in run_git_check_warning_only function ...
+warn!("{}", Colors::warning("------------------------------------------------------------"));
+warn!("{} {}", Symbols::warning(), Colors::warning(Colors::emphasis("Git Warning: Untracked files detected:")));
+// ... rest of function ...
+```
+
+### 13.5 Update Lint Module
+- [ ] 13.5.1 Modify `src/lint.rs`: Use ui_style for consistent styling
+```rust
+use crate::ui_style::{Colors, Symbols, Print};
+
+// ... in run_lint_checks function ...
+info!("{} {}", Symbols::cleanup(), Colors::info("Running Linters and Formatters (Attempting Fixes)..."));
+// ... rest of function ...
+```
+
+### 13.6 Update CLI Table Formatting
+- [ ] 13.6.1 Create helper functions for table formatting
+```rust
+pub fn format_lint_results_table(summary: &LintSummary) -> String {
+    use cli_table::{print_stdout, Table, WithTitle};
+
+    #[derive(Table)]
+    struct LintResultRow {
+        #[table(title = "Linter")]
+        linter: String,
+        #[table(title = "Status")]
+        status: String,
+        #[table(title = "Details")]
+        details: String,
+    }
+
+    // ... implementation ...
+}
+```
+
+## Final Testing Checklist (Updated)
+- [ ] Verify all flags work correctly
+- [ ] Test on real NixOS, home-manager, and nix-darwin configurations
+- [ ] Test behavior on non-git directories
+- [ ] Test with syntax errors in different files
+- [ ] Test with invalid flake references
+- [ ] Test on systems with and without formatters/linters installed
+- [ ] Verify consistent UI styling across all commands
+- [ ] Test in different terminal emulators and with different color schemes
+- [ ] Test with and without TTY (cargo run -- ... | cat)

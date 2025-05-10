@@ -5,7 +5,7 @@ use std::{
     time::SystemTime,
 };
 
-use cli_table::{print_stdout, Cell, Table};
+use cli_table::{print_stdout, Cell, Table, Style};
 use color_eyre::eyre::{bail, eyre, Context, ContextCompat};
 use nix::errno::Errno;
 use nix::{
@@ -212,8 +212,8 @@ impl interface::CleanMode {
             debug!("Failed to display cleanup steps as table: {}", e);
             // Fallback to simple text if table display fails
             println!("- 🗑️ Remove old generations: {}", "Yes".green());
-            println!("- 🧹 Run garbage collection: {}", if args.nogc { "No".red() } else { "Yes".green() });
-            println!("- ⚡ Optimize nix store: {}", if args.nooptimise { "No".red() } else { "Yes".green() });
+            println!("- 🧹 Run garbage collection: {}", if args.nogc { "No".red().to_string() } else { "Yes".green().to_string() });
+            println!("- ⚡ Optimize nix store: {}", if args.nooptimise { "No".red().to_string() } else { "Yes".green().to_string() });
         }
         
         println!();
