@@ -1,7 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::util::{compare_semver, add_verbosity_flags, is_stdout_tty, run_cmd, run_cmd_inherit_stdio};
-    use std::process::Command;
+    use crate::util::{
+        compare_semver, add_verbosity_flags, is_stdout_tty, run_cmd, run_cmd_inherit_stdio,
+        UtilCommandError, manage_out_path, run_piped_commands, MaybeTempPath
+    };
+    use std::process::{Command, Stdio};
+    use std::path::PathBuf;
 
     #[test]
     fn test_compare_semver() {
@@ -81,6 +85,38 @@ mod tests {
         let mut cmd = Command::new("false");
         let result = run_cmd(&mut cmd);
         assert!(result.is_err());
+        
+        // Verify the error type
+        match result {
+            Err(err) => {
+                match err {
+                    UtilCommandError::NonZeroStatus { command_str, status_code, stdout: _, stderr: _ } => {
+                        assert!(command_str.contains("false"));
+                        assert_eq!(status_code, "1");
+                    },
+                    _ => panic!("Expected NonZeroStatus error, got: {:?}", err),
+                }
+            },
+            _ => panic!("Expected error"),
+        }
+        
+        // Test with a non-existent command
+        let mut cmd = Command::new("command_that_does_not_exist_ever");
+        let result = run_cmd(&mut cmd);
+        assert!(result.is_err());
+        
+        // Verify the error type
+        match result {
+            Err(err) => {
+                match err {
+                    UtilCommandError::SpawnFailed { command_str, io_error: _ } => {
+                        assert!(command_str.contains("command_that_does_not_exist_ever"));
+                    },
+                    _ => panic!("Expected SpawnFailed error, got: {:?}", err),
+                }
+            },
+            _ => panic!("Expected error"),
+        }
     }
 
     #[test]
@@ -99,5 +135,98 @@ mod tests {
         let mut cmd = Command::new("false");
         let result = run_cmd_inherit_stdio(&mut cmd);
         assert!(result.is_err());
+        
+        // Verify the error type
+        match result {
+            Err(err) => {
+                match err {
+                    UtilCommandError::InheritedNonZeroStatus { command_str, status_code } => {
+                        assert!(command_str.contains("false"));
+                        assert_eq!(status_code, "1");
+                    },
+                    _ => panic!("Expected InheritedNonZeroStatus error, got: {:?}", err),
+                }
+            },
+            _ => panic!("Expected error"),
+        }
+    }
+    
+    #[test]
+    fn test_manage_out_path() {
+        // Test with a provided path
+        let provided_path = PathBuf::from("/tmp/test_out_link");
+        let result = manage_out_path(Some(&provided_path));
+        assert!(result.is_ok());
+        
+        if let Ok(path_manager) = result {
+            assert_eq!(path_manager.get_path(), &provided_path);
+        }
+        
+        // Test with no provided path (should create a temp dir)
+        let result = manage_out_path(None);
+        assert!(result.is_ok());
+        
+        if let Ok(path_manager) = result {
+            // The path should end with "result"
+            assert!(path_manager.get_path().ends_with("result"));
+            // The parent directory should exist
+            assert!(path_manager.get_path().parent().unwrap().exists());
+        }
+    }
+    
+    #[test]
+    fn test_run_piped_commands() {
+        // Test piping echo to grep
+        let cmd1 = Command::new("echo").arg("hello\nworld\nhello again");
+        let cmd2 = Command::new("grep").arg("hello");
+        
+        let result = run_piped_commands(cmd1, cmd2);
+        assert!(result.is_ok());
+        
+        if let Ok(output) = result {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(stdout.contains("hello"));
+            assert!(stdout.contains("hello again"));
+            assert!(!stdout.contains("world"));
+        }
+        
+        // Test with a failing first command
+        let cmd1 = Command::new("command_that_does_not_exist_ever");
+        let cmd2 = Command::new("grep").arg("hello");
+        
+        let result = run_piped_commands(cmd1, cmd2);
+        assert!(result.is_err());
+        
+        match result {
+            Err(err) => {
+                match err {
+                    UtilCommandError::SpawnFailed { command_str, io_error: _ } => {
+                        assert!(command_str.contains("command_that_does_not_exist_ever"));
+                    },
+                    _ => panic!("Expected SpawnFailed error, got: {:?}", err),
+                }
+            },
+            _ => panic!("Expected error"),
+        }
+        
+        // Test with a failing second command
+        let cmd1 = Command::new("echo").arg("hello");
+        let cmd2 = Command::new("grep").arg("--invalid-option");
+        
+        let result = run_piped_commands(cmd1, cmd2);
+        assert!(result.is_err());
+        
+        match result {
+            Err(err) => {
+                match err {
+                    UtilCommandError::NonZeroStatus { command_str, status_code, stdout: _, stderr: _ } => {
+                        assert!(command_str.contains("echo") && command_str.contains("grep"));
+                        assert_ne!(status_code, "0");
+                    },
+                    _ => panic!("Expected NonZeroStatus error, got: {:?}", err),
+                }
+            },
+            _ => panic!("Expected error"),
+        }
     }
 }

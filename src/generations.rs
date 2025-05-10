@@ -153,10 +153,18 @@ pub fn print_info(mut generations: Vec<GenerationInfo>) {
 
         if let Ok(output) = path_info {
             let size_info = String::from_utf8_lossy(&output.stdout);
-            let size = size_info.split_whitespace().nth(1).unwrap_or("Unknown");
+            // Improve error handling with more descriptive message
+            let size = size_info
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or_else(|| {
+                    debug!("Unexpected format in nix path-info output: {}", size_info);
+                    "Unknown size"
+                });
             size.to_string()
         } else {
-            "Unknown".to_string()
+            debug!("Failed to get closure size information");
+            "Unknown size".to_string()
         }
     };
 
@@ -189,17 +197,24 @@ pub fn print_info(mut generations: Vec<GenerationInfo>) {
     println!();
 
     // Determine column widths for pretty printing
+    // Use more descriptive variable names and safer defaults
     let max_nixos_version_len = generations
         .iter()
         .map(|g| g.nixos_version.len())
         .max()
-        .unwrap_or(22); // length of version + date + rev, assumes no tags
+        .unwrap_or_else(|| {
+            // Default to header length if no generations
+            "NixOS Version".len()
+        });
 
     let max_kernel_len = generations
         .iter()
         .map(|g| g.kernel_version.len())
         .max()
-        .unwrap_or(12); // arbitrary value
+        .unwrap_or_else(|| {
+            // Default to header length if no generations
+            "Kernel".len()
+        });
 
     println!(
         "{:<13} {:<20} {:<width_nixos$} {:<width_kernel$} {:<22} Specialisations",
@@ -214,10 +229,14 @@ pub fn print_info(mut generations: Vec<GenerationInfo>) {
 
     // Print generations in descending order
     for generation in generations.iter().rev() {
+        // Improve error handling for date formatting
         let formatted_date = parsed_dates
             .get(&generation.date)
             .cloned()
-            .unwrap_or_else(|| "Unknown".to_string());
+            .unwrap_or_else(|| {
+                debug!("Missing parsed date for generation {}", generation.number);
+                "Unknown date".to_string()
+            });
 
         let specialisations = if generation.specialisations.is_empty() {
             String::new()

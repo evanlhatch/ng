@@ -1,0 +1,7 @@
+/home/evan/2_Dev/2.4_Rust/ng/.devenv/flake.json
+/home/evan/2_Dev/2.4_Rust/ng/.devenv.flake.nix
+/home/evan/2_Dev/2.4_Rust/ng/.env
+/home/evan/2_Dev/2.4_Rust/ng/devenv.local.nix
+/home/evan/2_Dev/2.4_Rust/ng/devenv.lock
+/home/evan/2_Dev/2.4_Rust/ng/devenv.nix
+/home/evan/2_Dev/2.4_Rust/ng/devenv.yaml

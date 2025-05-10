@@ -4,6 +4,8 @@ use std::{env, fs};
 use clap::error::ErrorKind;
 use clap::{Arg, ArgAction, Args, FromArgMatches};
 use color_eyre::owo_colors::OwoColorize;
+use chumsky::prelude::*;
+use tracing::warn;
 
 // Reference: https://nix.dev/manual/nix/2.18/command-ref/new-cli/nix
 
@@ -36,6 +38,18 @@ impl FromArgMatches for Installable {
         let installable = matches.get_one::<String>("installable");
         let file = matches.get_one::<String>("file");
         let expr = matches.get_one::<String>("expr");
+        
+        // Robust attribute parsing helper
+        fn parse_attr_for_installable<S: AsRef<str>>(attr_str: S) -> Vec<String> {
+            let attr_s = attr_str.as_ref();
+            parse_attribute_robust(attr_s).unwrap_or_else(|parse_errs| {
+                // Convert chumsky errors to a string or log them
+                let err_msg = parse_errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+                warn!("Failed to robustly parse attribute '{}': {}. Falling back to simple parsing.", attr_s, err_msg);
+                // Fallback to the old simple parse_attribute
+                parse_attribute(attr_s)
+            })
+        }
 
         if let Some(i) = installable {
             let canonincal = fs::canonicalize(i);
@@ -50,14 +64,14 @@ impl FromArgMatches for Installable {
         if let Some(f) = file {
             return Ok(Self::File {
                 path: PathBuf::from(f),
-                attribute: parse_attribute(installable.cloned().unwrap_or_default()),
+                attribute: parse_attr_for_installable(installable.cloned().unwrap_or_default()),
             });
         }
 
         if let Some(e) = expr {
             return Ok(Self::Expression {
                 expression: e.to_string(),
-                attribute: parse_attribute(installable.cloned().unwrap_or_default()),
+                attribute: parse_attr_for_installable(installable.cloned().unwrap_or_default()),
             });
         }
 
@@ -66,7 +80,7 @@ impl FromArgMatches for Installable {
             let reference = elems.next().unwrap().to_owned();
             return Ok(Self::Flake {
                 reference,
-                attribute: parse_attribute(elems.next().map(|s| s.to_string()).unwrap_or_default()),
+                attribute: parse_attr_for_installable(elems.next().map(|s| s.to_string()).unwrap_or_default()),
             });
         }
 
@@ -79,7 +93,7 @@ impl FromArgMatches for Installable {
                     let mut elems = f.splitn(2, '#');
                     return Ok(Self::Flake {
                         reference: elems.next().unwrap().to_owned(),
-                        attribute: parse_attribute(
+                        attribute: parse_attr_for_installable(
                             elems.next().map(|s| s.to_string()).unwrap_or_default(),
                         ),
                     });
@@ -89,7 +103,7 @@ impl FromArgMatches for Installable {
                     let mut elems = f.splitn(2, '#');
                     return Ok(Self::Flake {
                         reference: elems.next().unwrap().to_owned(),
-                        attribute: parse_attribute(
+                        attribute: parse_attr_for_installable(
                             elems.next().map(|s| s.to_string()).unwrap_or_default(),
                         ),
                     });
@@ -99,7 +113,7 @@ impl FromArgMatches for Installable {
                     let mut elems = f.splitn(2, '#');
                     return Ok(Self::Flake {
                         reference: elems.next().unwrap().to_owned(),
-                        attribute: parse_attribute(
+                        attribute: parse_attr_for_installable(
                             elems.next().map(|s| s.to_string()).unwrap_or_default(),
                         ),
                     });
@@ -111,7 +125,7 @@ impl FromArgMatches for Installable {
             let mut elems = f.splitn(2, '#');
             return Ok(Self::Flake {
                 reference: elems.next().unwrap().to_owned(),
-                attribute: parse_attribute(elems.next().map(|s| s.to_string()).unwrap_or_default()),
+                attribute: parse_attr_for_installable(elems.next().map(|s| s.to_string()).unwrap_or_default()),
             });
         }
 
@@ -119,7 +133,7 @@ impl FromArgMatches for Installable {
             let mut elems = f.splitn(2, '#');
             return Ok(Self::Flake {
                 reference: elems.next().unwrap().to_owned(),
-                attribute: parse_attribute(elems.next().map(|s| s.to_string()).unwrap_or_default()),
+                attribute: parse_attr_for_installable(elems.next().map(|s| s.to_string()).unwrap_or_default()),
             });
         }
 
@@ -127,7 +141,7 @@ impl FromArgMatches for Installable {
             let mut elems = f.splitn(2, '#');
             return Ok(Self::Flake {
                 reference: elems.next().unwrap().to_owned(),
-                attribute: parse_attribute(elems.next().map(|s| s.to_string()).unwrap_or_default()),
+                attribute: parse_attr_for_installable(elems.next().map(|s| s.to_string()).unwrap_or_default()),
             });
         }
 
@@ -135,14 +149,14 @@ impl FromArgMatches for Installable {
             let mut elems = f.splitn(2, '#');
             return Ok(Self::Flake {
                 reference: elems.next().unwrap().to_owned(),
-                attribute: parse_attribute(elems.next().map(|s| s.to_string()).unwrap_or_default()),
+                attribute: parse_attr_for_installable(elems.next().map(|s| s.to_string()).unwrap_or_default()),
             });
         }
 
         if let Ok(f) = env::var("NH_FILE") {
             return Ok(Self::File {
                 path: PathBuf::from(f),
-                attribute: parse_attribute(env::var("NH_ATTRP").unwrap_or_default()),
+                attribute: parse_attr_for_installable(env::var("NH_ATTRP").unwrap_or_default()),
             });
         }
 
@@ -217,8 +231,55 @@ Nix accepts various kinds of installables:
     }
 }
 
-// TODO: should handle quoted attributes, like foo."bar.baz" -> ["foo", "bar.baz"]
-// maybe use chumsky?
+// --- Chumsky Parsers for Attribute Paths ---
+fn nix_identifier_char_first() -> impl Parser<char, char, Error = Simple<char>> {
+    filter(|c: &char| c.is_ascii_alphabetic() || *c == '_')
+}
+
+fn nix_identifier_char_rest() -> impl Parser<char, char, Error = Simple<char>> {
+    filter(|c: &char| c.is_ascii_alphanumeric() || *c == '_' || *c == '\'' || *c == '-')
+}
+
+fn nix_identifier() -> impl Parser<char, String, Error = Simple<char>> {
+    nix_identifier_char_first()
+        .chain(nix_identifier_char_rest().repeated())
+        .collect()
+}
+
+fn quoted_string_content() -> impl Parser<char, char, Error = Simple<char>> {
+    filter(|c: &char| *c != '"' && *c != '\\').or(just('\\').ignore_then(any()))
+}
+
+fn quoted_string() -> impl Parser<char, String, Error = Simple<char>> {
+    just('"')
+        .ignore_then(quoted_string_content().repeated().collect())
+        .then_ignore(just('"'))
+}
+
+fn attribute_segment() -> impl Parser<char, String, Error = Simple<char>> {
+    nix_identifier().or(quoted_string())
+}
+
+pub fn attribute_path_parser() -> impl Parser<char, Vec<String>, Error = Simple<char>> {
+    attribute_segment()
+        .separated_by(just('.'))
+        .at_least(0) // To handle empty string correctly
+        .collect()
+}
+
+// New robust parse_attribute function using chumsky
+pub fn parse_attribute_robust<S>(s: S) -> Result<Vec<String>, Vec<Simple<char>>>
+where
+    S: AsRef<str>,
+{
+    let s = s.as_ref();
+    if s.is_empty() {
+        return Ok(Vec::new());
+    }
+    attribute_path_parser().parse(s)
+}
+
+// Keep the old parse_attribute for backward compatibility and fallback
 pub fn parse_attribute<S>(s: S) -> Vec<String>
 where
     S: AsRef<str>,
@@ -265,6 +326,109 @@ fn test_parse_attribute() {
     assert_eq!(parse_attribute(r#"foo."bar.baz""#), vec!["foo", "bar.baz"]);
     let v: Vec<String> = vec![];
     assert_eq!(parse_attribute(""), v)
+}
+
+#[test]
+fn test_parse_attribute_robust() {
+    assert_eq!(parse_attribute_robust("foo.bar").unwrap(), vec!["foo", "bar"]);
+    assert_eq!(parse_attribute_robust("foo.\"bar.baz\"").unwrap(), vec!["foo", "bar.baz"]);
+    assert_eq!(parse_attribute_robust("\"foo.bar\".baz").unwrap(), vec!["foo.bar", "baz"]);
+    assert_eq!(parse_attribute_robust("foo").unwrap(), vec!["foo"]);
+    assert_eq!(parse_attribute_robust("\"foo\"").unwrap(), vec!["foo"]);
+    assert_eq!(parse_attribute_robust("").unwrap(), Vec::<String>::new());
+}
+
+#[test]
+fn test_nix_identifier() {
+    // Test valid identifiers
+    assert_eq!(nix_identifier().parse("a").unwrap(), "a");
+    assert_eq!(nix_identifier().parse("a_b").unwrap(), "a_b");
+    assert_eq!(nix_identifier().parse("_a").unwrap(), "_a");
+    assert_eq!(nix_identifier().parse("a-b").unwrap(), "a-b");
+    assert_eq!(nix_identifier().parse("a'b").unwrap(), "a'b");
+    assert_eq!(nix_identifier().parse("abc123").unwrap(), "abc123");
+    
+    // Test invalid identifiers
+    assert!(nix_identifier().parse("1a").is_err());
+    assert!(nix_identifier().parse(".a").is_err());
+    assert!(nix_identifier().parse("a.b").is_err());
+    assert!(nix_identifier().parse("").is_err());
+}
+
+#[test]
+fn test_quoted_string() {
+    // Test simple strings
+    assert_eq!(quoted_string().parse("\"foo\"").unwrap(), "foo");
+    
+    // Test strings with spaces
+    assert_eq!(quoted_string().parse("\"foo bar\"").unwrap(), "foo bar");
+    
+    // Test strings with dots
+    assert_eq!(quoted_string().parse("\"foo.bar\"").unwrap(), "foo.bar");
+    
+    // Test strings with escaped quotes
+    assert_eq!(quoted_string().parse("\"foo\\\"bar\"").unwrap(), "foo\"bar");
+    
+    // Test strings with other escaped characters
+    assert_eq!(quoted_string().parse("\"foo\\\\bar\"").unwrap(), "foo\\bar");
+    
+    // Test invalid quoted strings
+    assert!(quoted_string().parse("foo").is_err());
+    assert!(quoted_string().parse("\"foo").is_err());
+    assert!(quoted_string().parse("foo\"").is_err());
+    assert!(quoted_string().parse("").is_err());
+}
+
+#[test]
+fn test_attribute_segment() {
+    // Test with identifiers
+    assert_eq!(attribute_segment().parse("foo").unwrap(), "foo");
+    assert_eq!(attribute_segment().parse("_foo").unwrap(), "_foo");
+    assert_eq!(attribute_segment().parse("foo_bar").unwrap(), "foo_bar");
+    assert_eq!(attribute_segment().parse("foo-bar").unwrap(), "foo-bar");
+    
+    // Test with quoted strings
+    assert_eq!(attribute_segment().parse("\"foo\"").unwrap(), "foo");
+    assert_eq!(attribute_segment().parse("\"foo.bar\"").unwrap(), "foo.bar");
+    assert_eq!(attribute_segment().parse("\"foo bar\"").unwrap(), "foo bar");
+    
+    // Test invalid segments
+    assert!(attribute_segment().parse("").is_err());
+    assert!(attribute_segment().parse("1foo").is_err());
+    assert!(attribute_segment().parse("foo.bar").is_err());
+}
+
+#[test]
+fn test_attribute_path_parser_comprehensive() {
+    // Test single segment
+    assert_eq!(attribute_path_parser().parse("foo").unwrap(), vec!["foo"]);
+    
+    // Test multiple segments
+    assert_eq!(attribute_path_parser().parse("foo.bar").unwrap(), vec!["foo", "bar"]);
+    assert_eq!(attribute_path_parser().parse("foo.bar.baz").unwrap(), vec!["foo", "bar", "baz"]);
+    
+    // Test with quoted segments containing dots
+    assert_eq!(
+        attribute_path_parser().parse("foo.\"bar.baz\"").unwrap(),
+        vec!["foo", "bar.baz"]
+    );
+    
+    // Test with quoted segments at the beginning
+    assert_eq!(
+        attribute_path_parser().parse("\"foo.bar\".baz").unwrap(),
+        vec!["foo.bar", "baz"]
+    );
+    
+    // Test with quoted segments
+    assert_eq!(attribute_path_parser().parse("\"foo\"").unwrap(), vec!["foo"]);
+    
+    // Test empty string
+    assert_eq!(attribute_path_parser().parse("").unwrap(), Vec::<String>::new());
+    
+    // Test invalid paths
+    assert!(attribute_path_parser().parse(".foo").is_err());
+    assert!(attribute_path_parser().parse("foo.").is_err());
+    assert!(attribute_path_parser().parse("foo..bar").is_err());
 }
 
 impl Installable {
@@ -334,7 +498,11 @@ where
 
         let s = elem.as_ref();
 
-        if s.contains('.') {
+        // Quote the segment if it contains a dot or any character that would make it
+        // an invalid Nix identifier
+        if s.contains('.') || s.is_empty() || s.chars().next().map_or(false, |c|
+            !(c.is_ascii_alphabetic() || c == '_')) ||
+            s.chars().any(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '\'' || c == '-')) {
             res.push_str(&format!(r#""{}""#, s));
         } else {
             res.push_str(s);

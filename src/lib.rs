@@ -7,6 +7,24 @@ pub mod ui_style;
 pub mod tables;
 pub mod util;
 
+// Workflow refactoring modules
+pub mod workflow_types;
+pub mod context;
+pub mod workflow_strategy;
+pub mod workflow_executor;
+pub mod nixos_strategy;
+// Phase 3: Implementing nil integration
+pub mod nix_analyzer;
+pub mod pre_flight;
+pub mod nix_interface; // Now with real implementation
+
+#[cfg(test)]
+mod workflow_executor_test;
+#[cfg(test)]
+mod nixos_strategy_test;
+#[cfg(test)]
+mod installable_test;
+
 // Existing modules
 pub mod commands;
 pub mod interface;

@@ -52,7 +52,7 @@ where
     }
 }
 
-pub(crate) fn setup_logging(verbose_level: u8) -> Result<()> {
+pub fn setup_logging(verbose_level: u8) -> Result<()> {
     color_eyre::config::HookBuilder::default()
         .display_location_section(true)
         .panic_section("Please report the bug at https://github.com/viperML/nh/issues")

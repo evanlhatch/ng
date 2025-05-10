@@ -1,14 +1,15 @@
 use std::ffi::{OsStr, OsString};
+use std::process::{Command as StdCommand, Stdio};
 
 use color_eyre::{
-    eyre::{bail, Context},
+    eyre::{bail, eyre, Context},
     Result,
 };
-use subprocess::{Exec, ExitStatus, Redirection};
 use thiserror::Error;
 use tracing::{debug, info};
 
 use crate::installable::Installable;
+use crate::util::{self, UtilCommandError};
 
 #[derive(Debug)]
 pub struct Command {
@@ -62,67 +63,92 @@ impl Command {
     }
 
     pub fn run(&self) -> Result<()> {
-        let cmd = if self.elevate {
-            let cmd = if cfg!(target_os = "macos") {
-                // Check for if sudo has the preserve-env flag
-                Exec::cmd("sudo").args(
-                    if Exec::cmd("sudo")
-                        .args(&["--help"])
-                        .stderr(Redirection::None)
-                        .stdout(Redirection::Pipe)
-                        .capture()?
-                        .stdout_str()
-                        .contains("--preserve-env")
-                    {
-                        &["--set-home", "--preserve-env=PATH", "env"]
-                    } else {
-                        &["--set-home"]
-                    },
-                )
-            } else {
-                Exec::cmd("sudo")
-            };
-
-            cmd.arg(&self.command).args(&self.args)
-        } else {
-            Exec::cmd(&self.command).args(&self.args)
-        }
-        .stderr(Redirection::None)
-        .stdout(Redirection::None);
-
         if let Some(m) = &self.message {
             info!("{}", m);
         }
 
-        debug!(?cmd);
-
-        if !self.dry {
-            if let Some(m) = &self.message {
-                cmd.join().wrap_err(m.clone())?;
-            } else {
-                cmd.join()?;
-            }
+        if self.dry {
+            info!("Dry-run: Would execute: {} {}", self.command.to_string_lossy(),
+                self.args.iter().map(|a| a.to_string_lossy()).collect::<Vec<_>>().join(" "));
+            return Ok(());
         }
 
-        Ok(())
+        let mut cmd = if self.elevate {
+            // Handle sudo with proper flags
+            let mut sudo_cmd = StdCommand::new("sudo");
+            
+            if cfg!(target_os = "macos") {
+                // Check if sudo has the preserve-env flag
+                let mut check_cmd = StdCommand::new("sudo");
+                check_cmd.arg("--help");
+                
+                match util::run_cmd(&mut check_cmd) {
+                    Ok(output) => {
+                        let output_str = String::from_utf8_lossy(&output.stdout);
+                        if output_str.contains("--preserve-env") {
+                            sudo_cmd.args(["--set-home", "--preserve-env=PATH", "env"]);
+                        } else {
+                            sudo_cmd.arg("--set-home");
+                        }
+                    },
+                    Err(_) => {
+                        // If we can't check, use a safe default
+                        sudo_cmd.arg("--set-home");
+                    }
+                }
+            }
+            
+            sudo_cmd.arg(&self.command);
+            sudo_cmd.args(&self.args);
+            sudo_cmd
+        } else {
+            let mut cmd = StdCommand::new(&self.command);
+            cmd.args(&self.args);
+            cmd
+        };
+
+        debug!("Executing command: {:?}", cmd);
+        
+        match util::run_cmd_inherit_stdio(&mut cmd) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if let Some(m) = &self.message {
+                    Err(eyre!("{}: {}", m, e))
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
     }
 
     pub fn run_capture(&self) -> Result<Option<String>> {
-        let cmd = Exec::cmd(&self.command)
-            .args(&self.args)
-            .stderr(Redirection::None)
-            .stdout(Redirection::Pipe);
-
         if let Some(m) = &self.message {
             info!("{}", m);
         }
 
-        debug!(?cmd);
+        if self.dry {
+            info!("Dry-run: Would execute: {} {}", self.command.to_string_lossy(),
+                self.args.iter().map(|a| a.to_string_lossy()).collect::<Vec<_>>().join(" "));
+            return Ok(None);
+        }
 
-        if !self.dry {
-            Ok(Some(cmd.capture()?.stdout_str()))
-        } else {
-            Ok(None)
+        let mut cmd = StdCommand::new(&self.command);
+        cmd.args(&self.args);
+        
+        debug!("Executing command: {:?}", cmd);
+        
+        match util::run_cmd(&mut cmd) {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+                Ok(Some(stdout))
+            },
+            Err(e) => {
+                if let Some(m) = &self.message {
+                    Err(eyre!("{}: {}", m, e))
+                } else {
+                    Err(e.into())
+                }
+            }
         }
     }
 }
@@ -178,41 +204,40 @@ impl Build {
 
         let installable_args = self.installable.to_args();
 
-        let exit = if self.nom {
-            let cmd = {
-                Exec::cmd("nix")
-                    .arg("build")
-                    .args(&installable_args)
-                    .args(&["--log-format", "internal-json", "--verbose"])
-                    .args(&self.extra_args)
-                    .stdout(Redirection::Pipe)
-                    .stderr(Redirection::Merge)
-                    | Exec::cmd("nom").args(&["--json"])
-            }
-            .stdout(Redirection::None);
-            debug!(?cmd);
-            cmd.join()
-        } else {
-            let cmd = Exec::cmd("nix")
-                .arg("build")
+        if self.nom {
+            // Use run_piped_commands for nom integration
+            let mut nix_cmd = StdCommand::new("nix");
+            nix_cmd.arg("build")
                 .args(&installable_args)
-                .args(&self.extra_args)
-                .stdout(Redirection::None)
-                .stderr(Redirection::Merge);
+                .args(&["--log-format", "internal-json", "--verbose"])
+                .args(&self.extra_args);
 
-            debug!(?cmd);
-            cmd.join()
-        };
+            let mut nom_cmd = StdCommand::new("nom");
+            nom_cmd.args(&["--json"]);
 
-        match exit? {
-            ExitStatus::Exited(0) => (),
-            other => bail!(ExitError(other)),
+            debug!("Executing piped command: {:?} | {:?}", nix_cmd, nom_cmd);
+            
+            match util::run_piped_commands(nix_cmd, nom_cmd) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e.into())
+            }
+        } else {
+            // Use regular command execution
+            let mut cmd = StdCommand::new("nix");
+            cmd.arg("build")
+                .args(&installable_args)
+                .args(&self.extra_args);
+
+            debug!("Executing command: {:?}", cmd);
+            
+            match util::run_cmd_inherit_stdio(&mut cmd) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e.into())
+            }
         }
-
-        Ok(())
     }
 }
 
 #[derive(Debug, Error)]
-#[error("Command exited with status {0:?}")]
-pub struct ExitError(ExitStatus);
+#[error("Command execution failed: {0}")]
+pub struct ExitError(String);

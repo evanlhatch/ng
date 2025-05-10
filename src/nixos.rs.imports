@@ -1,0 +1,22 @@
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command as StdCommand;
+use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{eyre, Result};
+use nix;
+use walkdir::WalkDir;
+use rayon::prelude::*;
+
+// New imports for workflow refactoring
+use crate::workflow_executor::execute_rebuild_workflow;
+use crate::nixos_strategy::NixosPlatformStrategy;
+use crate::workflow_strategy::ActivationMode;
+use crate::context::OperationContext;
+use crate::nix_interface::NixInterface;
+use crate::workflow_types::CommonRebuildArgs;
+
+const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
+const CURRENT_PROFILE: &str = "/run/current-system";
+
+const SPEC_LOCATION: &str = "/etc/specialisation";

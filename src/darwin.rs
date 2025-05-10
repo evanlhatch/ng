@@ -141,10 +141,10 @@ impl DarwinRebuildArgs {
         }
     
         if self.update_args.update {
-            update(&self.common.installable, self.update_args.update_input)?;
+            update(&self.common.installable, self.update_args.update_input.clone())?;
         }
 
-        let hostname = self.hostname.ok_or(()).or_else(|()| get_hostname())?;
+        let hostname = self.hostname.clone().ok_or(()).or_else(|()| get_hostname())?;
 
         let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
@@ -187,13 +187,14 @@ impl DarwinRebuildArgs {
             }
         }
 
-        let toplevel = toplevel_for(hostname, processed_installable);
+        // Fix parameter order to match toplevel_for(installable, hostname, args)
+        let toplevel = toplevel_for(processed_installable, &hostname, &self);
 
         // Add progress indicator for build
         let pb_build = crate::progress::start_spinner("[🔨 Build] Building configuration...");
         
         // Use the existing build mechanism but enhance error handling
-        let build_result = commands::Build::new(toplevel)
+        let build_result = commands::Build::new(toplevel?)
             .extra_arg("--out-link")
             .extra_arg(out_path.get_path())
             .extra_args(&self.extra_args)
