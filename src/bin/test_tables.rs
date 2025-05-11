@@ -1,7 +1,7 @@
 //! Test program for table formatting
 
-use nh::lint::{CheckStatus, LintOutcome, LintSummary, format_lint_results_table};
-use nh::tables::format_package_diff_table;
+use ng::lint::{CheckStatus, LintOutcome, LintSummary, format_lint_results_table};
+use ng::tables::format_package_diff_table;
 
 fn main() {
     println!("=== Testing Table Formatting ===\n");

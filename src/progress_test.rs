@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nh::progress::{start_spinner, update_spinner_message, finish_spinner_success, finish_spinner_fail};
+    use ng::progress::{start_spinner, update_spinner_message, finish_spinner_success, finish_spinner_fail};
     use indicatif::ProgressBar;
     use std::time::Duration;
 

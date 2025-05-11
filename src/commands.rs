@@ -10,7 +10,7 @@ use color_eyre::{
     owo_colors::OwoColorize,
 };
 use thiserror::Error;
-use tracing::{debug, info}; // Added warn here
+use tracing::{debug, info};
 
 #[cfg(test)]
 pub(crate) mod test_support {
@@ -439,6 +439,7 @@ impl Command {
 
         #[cfg(test)]
         if test_support::is_test_mode_enabled() {
+            use tracing::warn; // Moved import here
             test_support::record_command(&cmd_str);
             // Use the new mock getter which returns Option<Result<std::process::Output, Report>>
             if let Some(mock_result) = test_support::get_mock_process_output() {

@@ -1,4 +1,4 @@
-use nh::error_handler::{enhance_syntax_error_output, generate_syntax_error_recommendations};
+use ng::error_handler::{enhance_syntax_error_output, generate_syntax_error_recommendations};
 
 #[test]
 fn test_generate_syntax_error_recommendations() {

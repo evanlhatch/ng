@@ -19,7 +19,7 @@ impl interface::HomeArgs {
             HomeSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
             HomeSubcommand::Build(args) => {
                 if args.common.common.ask || args.common.common.dry {
-                    warn!("`--ask` and `--dry` have no effect for `nh home build`");
+                    warn!("`--ask` and `--dry` have no effect for `ng home build`");
                 }
                 args.rebuild(Build, verbose_count)
             }
@@ -143,16 +143,16 @@ impl HomeRebuildArgs {
         let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
             None => Box::new({
-                let dir = tempfile::Builder::new().prefix("nh-os").tempdir()?;
+                let dir = tempfile::Builder::new().prefix("ng-os").tempdir()?;
                 (dir.as_ref().join("result"), dir)
             }),
         };
 
         debug!(?out_path);
 
-        // Use NH_HOME_FLAKE if available, otherwise use the provided installable
-        let installable = if let Ok(home_flake) = env::var("NH_HOME_FLAKE") {
-            debug!("Using NH_HOME_FLAKE: {}", home_flake);
+        // Use NG_HOME_FLAKE if available, otherwise use the provided installable
+        let installable = if let Ok(home_flake) = env::var("NG_HOME_FLAKE") {
+            debug!("Using NG_HOME_FLAKE: {}", home_flake);
 
             let mut elems = home_flake.splitn(2, '#');
             let reference = elems.next().unwrap().to_owned();
@@ -472,9 +472,9 @@ where
 
 impl HomeReplArgs {
     fn run(self, _verbose_count: u8) -> Result<()> {
-        // Use NH_HOME_FLAKE if available, otherwise use the provided installable
-        let installable = if let Ok(home_flake) = env::var("NH_HOME_FLAKE") {
-            debug!("Using NH_HOME_FLAKE: {}", home_flake);
+        // Use NG_HOME_FLAKE if available, otherwise use the provided installable
+        let installable = if let Ok(home_flake) = env::var("NG_HOME_FLAKE") {
+            debug!("Using NG_HOME_FLAKE: {}", home_flake);
 
             let mut elems = home_flake.splitn(2, '#');
             let reference = elems.next().unwrap().to_owned();

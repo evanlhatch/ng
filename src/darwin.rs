@@ -28,7 +28,7 @@ impl DarwinArgs {
             DarwinSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
             DarwinSubcommand::Build(args) => {
                 if args.common.common.ask || args.common.common.dry {
-                    warn!("`--ask` and `--dry` have no effect for `nh darwin build`");
+                    warn!("`--ask` and `--dry` have no effect for `ng darwin build`");
                 }
                 args.rebuild(Build, verbose_count)
             }
@@ -87,7 +87,7 @@ impl DarwinRebuildArgs {
         use DarwinRebuildVariant::*;
     
         if nix::unistd::Uid::effective().is_root() {
-            bail!("Don't run nh os as root. I will call sudo internally as needed");
+            bail!("Don't run ng os as root. I will call sudo internally as needed");
         }
     
         // Add pre-flight checks
@@ -194,16 +194,16 @@ impl DarwinRebuildArgs {
         let out_path: Box<dyn crate::util::MaybeTempPath> = match self.common.common.out_link {
             Some(ref p) => Box::new(p.clone()),
             None => Box::new({
-                let dir = tempfile::Builder::new().prefix("nh-os").tempdir()?;
+                let dir = tempfile::Builder::new().prefix("ng-os").tempdir()?;
                 (dir.as_ref().join("result"), dir)
             }),
         };
 
         debug!(?out_path);
 
-        // Use NH_DARWIN_FLAKE if available, otherwise use the provided installable
-        let installable = if let Ok(darwin_flake) = env::var("NH_DARWIN_FLAKE") {
-            debug!("Using NH_DARWIN_FLAKE: {}", darwin_flake);
+        // Use NG_DARWIN_FLAKE if available, otherwise use the provided installable
+        let installable = if let Ok(darwin_flake) = env::var("NG_DARWIN_FLAKE") {
+            debug!("Using NG_DARWIN_FLAKE: {}", darwin_flake);
 
             let mut elems = darwin_flake.splitn(2, '#');
             let reference = elems.next().unwrap().to_owned();
@@ -441,9 +441,9 @@ impl DarwinRebuildArgs {
 
 impl DarwinReplArgs {
     fn run(self, _verbose_count: u8) -> Result<(), color_eyre::Report> {
-        // Use NH_DARWIN_FLAKE if available, otherwise use the provided installable
-        let mut target_installable = if let Ok(darwin_flake) = env::var("NH_DARWIN_FLAKE") {
-            debug!("Using NH_DARWIN_FLAKE: {}", darwin_flake);
+        // Use NG_DARWIN_FLAKE if available, otherwise use the provided installable
+        let mut target_installable = if let Ok(darwin_flake) = env::var("NG_DARWIN_FLAKE") {
+            debug!("Using NG_DARWIN_FLAKE: {}", darwin_flake);
 
             let mut elems = darwin_flake.splitn(2, '#');
             let reference = elems.next().unwrap().to_owned();

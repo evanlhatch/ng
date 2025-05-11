@@ -1,7 +1,7 @@
 //! Test program for enhanced UI elements
 
 use color_eyre::eyre::Result;
-use nh::ui_style::{Colors, Symbols, Print};
+use ng::ui_style::{Colors, Symbols, Print};
 use tracing::info;
 
 fn main() -> Result<()> {
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
     ];
     
     // Handle errors without propagating
-    if let Err(e) = nh::tables::display_lint_results(lint_results) {
+    if let Err(e) = ng::tables::display_lint_results(lint_results) {
         eprintln!("Error displaying lint results: {}", e);
     }
     
@@ -56,7 +56,7 @@ fn main() -> Result<()> {
     ];
     
     // Handle errors without propagating
-    if let Err(e) = nh::tables::display_package_diff(added, removed, changed) {
+    if let Err(e) = ng::tables::display_package_diff(added, removed, changed) {
         eprintln!("Error displaying package diff: {}", e);
     }
     
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
     ];
     
     // Handle errors without propagating
-    if let Err(e) = nh::tables::display_git_status(untracked_files, modified_files) {
+    if let Err(e) = ng::tables::display_git_status(untracked_files, modified_files) {
         eprintln!("Error displaying git status: {}", e);
     }
     
@@ -97,7 +97,7 @@ error: syntax error, unexpected '}', expecting ';'
          | ^
 "#;
     
-    let enhanced = nh::error_handler::enhance_syntax_error_output(error_details);
+    let enhanced = ng::error_handler::enhance_syntax_error_output(error_details);
     println!("{}", enhanced);
     
     let recommendations = vec![

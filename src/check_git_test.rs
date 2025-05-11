@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nh::check_git::{is_git_repo, git_command, run_git_check_warning_only};
+    use ng::check_git::{is_git_repo, git_command, run_git_check_warning_only};
     use std::fs;
     use std::path::Path;
     use std::process::Command;

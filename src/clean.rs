@@ -75,7 +75,7 @@ impl interface::CleanMode {
             }
             interface::CleanMode::User(args) => {
                 if uid.is_root() {
-                    bail!("nh clean user: don't run me as root!");
+                    bail!("ng clean user: don't run me as root!");
                 }
                 let user = nix::unistd::User::from_uid(uid)?.unwrap();
                 profiles.extend(profiles_in_dir(
@@ -165,7 +165,7 @@ impl interface::CleanMode {
         // Present the user the information about the paths to clean
         use owo_colors::OwoColorize;
         println!();
-        println!("{}", "Welcome to nh clean".bold());
+        println!("{}", "Welcome to ng clean".bold());
         println!("Keeping {} generation(s)", args.keep.green());
         println!("Keeping paths newer than {}", args.keep_since.green());
         

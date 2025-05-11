@@ -34,6 +34,8 @@ pub struct ExternalLintersConfig {
     pub enable: Option<Vec<String>>, // e.g., ["statix", "deadnix"]
     pub statix_path: Option<String>,
     pub deadnix_path: Option<String>,
+    pub statix_args: Option<Vec<String>>,
+    pub deadnix_args: Option<Vec<String>>,
 }
 
 impl NgConfig {

@@ -26,7 +26,7 @@ mod tests {
                 "Failed to parse test NgConfig from string: {}\nContent:\n{}",
                 e, config_str
             );
-));
+        }));
         let mut clap_common_args = ClapCommonArgs {
             no_preflight: false,
             strict_lint: None,   // Changed for Option<bool>
@@ -509,6 +509,8 @@ checks = ["External Linters"]
 enable = ["statix", "deadnix"]
 statix_path = "./mock_statix"
 deadnix_path = "./mock_deadnix"
+statix_args = ["--some-statix-arg"]
+deadnix_args = ["--custom-deadnix-arg", "--another"]
 "#;
         let op_ctx = create_op_ctx_for_preflight(&temp_dir, ng_toml_content, None);
         let mock_strategy = MockPlatformStrategy;
@@ -536,8 +538,8 @@ deadnix_path = "./mock_deadnix"
         assert!(
             recorded_commands
                 .iter()
-                .any(|cmd| cmd == &format!("./mock_statix check {}", temp_path_str)),
-            "statix check <temp_path> not recorded. Expected: 'statix check {}'. Recorded: {:?}",
+                .any(|cmd| cmd == &format!("./mock_statix check --some-statix-arg --json {}", temp_path_str)),
+            "statix check command with custom arg not recorded. Expected: './mock_statix check --some-statix-arg --json {}'. Recorded: {:?}",
             temp_path_str,
             recorded_commands
         );
@@ -552,8 +554,8 @@ deadnix_path = "./mock_deadnix"
         );
         // Check for deadnix --check
         assert!(
-            recorded_commands.iter().any(|cmd| cmd == "./mock_deadnix --check"),
-            "deadnix --check not recorded. Recorded: {:?}",
+            recorded_commands.iter().any(|cmd| cmd == "./mock_deadnix --custom-deadnix-arg --another"),
+            "deadnix with custom args not recorded. Recorded: {:?}",
             recorded_commands
         );
 
@@ -707,10 +709,10 @@ deadnix_path = "./mock_deadnix"
         let ng_toml_content = r#"
 [pre_flight]
 checks = ["External Linters"]
-strict_lint = false // Doesn't matter for this test
+strict_lint = false # Doesn't matter for this test
 [pre_flight.external_linters]
 enable = ["statix", "deadnix"]
-statix_path = "./mock_statix" // This path will be checked for existence
+statix_path = "./mock_statix" # This path will be checked for existence
 deadnix_path = "./mock_deadnix"
 "#;
 
@@ -797,11 +799,15 @@ enable = [] # Explicitly empty list
         test_support::disable_test_mode();
     }
 
+#[test]
     fn test_external_linters_deadnix_fails_not_strict() {
         let temp_dir = TempDir::new().unwrap();
         let bad_nix_path = temp_dir.path().join("bad.nix");
         fs::write(&bad_nix_path, "{ foo = 1; bar = 2; }").unwrap();
         test_support::enable_test_mode();
+
+        // Create mock executables
+        fs::write(temp_dir.path().join("mock_deadnix"), "").unwrap();
 
         // Mock deadnix exists
         test_support::set_mock_run_result(Ok(()));
@@ -821,6 +827,7 @@ checks = ["External Linters"]
 strict_lint = false
 [pre_flight.external_linters]
 enable = ["deadnix"]
+deadnix_path = "./mock_deadnix"
 "#;
         let op_ctx = create_op_ctx_for_preflight(&temp_dir, ng_toml_content, None);
         let result = run_shared_pre_flight_checks(&op_ctx, &MockPlatformStrategy, &());
@@ -836,6 +843,9 @@ enable = ["deadnix"]
         let bad_nix_path = temp_dir.path().join("bad.nix");
         fs::write(&bad_nix_path, "{ foo = 1; bar = 2; }").unwrap();
         test_support::enable_test_mode();
+
+        // Create mock executables
+        fs::write(temp_dir.path().join("mock_deadnix"), "").unwrap();
 
         // Mock deadnix exists
         test_support::set_mock_run_result(Ok(()));
@@ -855,6 +865,7 @@ checks = ["External Linters"]
 strict_lint = true
 [pre_flight.external_linters]
 enable = ["deadnix"]
+deadnix_path = "./mock_deadnix"
 "#;
         let op_ctx = create_op_ctx_for_preflight(&temp_dir, ng_toml_content, None);
         let result = run_shared_pre_flight_checks(&op_ctx, &MockPlatformStrategy, &());
@@ -864,6 +875,53 @@ enable = ["deadnix"]
             assert!(e.to_string().contains("Critical pre-flight check 'External Linters' failed"));
         }
 test_support::disable_test_mode();
-}
+    }
+
+    #[test]
+    fn test_external_linters_empty_project_root() {
+        let temp_dir = TempDir::new().unwrap(); // Empty project root
+        test_support::enable_test_mode();
+
+        // Create mock executables
+        fs::write(temp_dir.path().join("mock_statix"), "").unwrap();
+        fs::write(temp_dir.path().join("mock_deadnix"), "").unwrap();
+
+        // Mock command_exists for statix
+        test_support::set_mock_run_result(Ok(()));
+        // Mock statix run_capture_output (success, empty output)
+        test_support::set_mock_process_output(Ok(std::process::Output {
+            status: std::os::unix::process::ExitStatusExt::from_raw(0),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        }));
+
+        // Mock command_exists for deadnix
+        test_support::set_mock_run_result(Ok(()));
+        // Mock deadnix run_capture_output (success, empty output)
+        test_support::set_mock_process_output(Ok(std::process::Output {
+            status: std::os::unix::process::ExitStatusExt::from_raw(0),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        }));
+
+        let ng_toml_content = r#"
+[pre_flight]
+checks = ["External Linters"]
+[pre_flight.external_linters]
+enable = ["statix", "deadnix"]
+statix_path = "./mock_statix"
+deadnix_path = "./mock_deadnix"
+"#;
+        let op_ctx = create_op_ctx_for_preflight(&temp_dir, ng_toml_content, None);
+        let result = run_shared_pre_flight_checks(&op_ctx, &MockPlatformStrategy, &());
+
+        assert!(result.is_ok(), "Expected check to pass for empty project root: {:?}", result.err());
+        
+        let recorded_commands = test_support::get_recorded_commands();
+        assert!(recorded_commands.iter().any(|cmd| cmd.starts_with("./mock_statix check --json")));
+        assert!(recorded_commands.iter().any(|cmd| cmd.eq("./mock_deadnix --check")));
+
+        test_support::disable_test_mode();
+    }
 }
     

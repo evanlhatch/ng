@@ -1,5 +1,5 @@
 [package]
-name = "nh"
+name = "ng"
 version = "4.0.2"
 edition = "2021"
 license = "EUPL-1.2"
@@ -51,7 +51,7 @@ tracing-subscriber = { version = "0.3.18", features = [
     "std"
 ] }
 uzers = { version = "0.12.0", default-features = false }
-# New dependencies for nh enhancement (Phase 1.1)
+# New dependencies for ng enhancement (Phase 1.1)
 indicatif = { version = "0.17", features = ["improved_unicode"] }
 cli-table = "0.4"
 rayon = "1"

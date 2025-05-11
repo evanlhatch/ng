@@ -1,6 +1,6 @@
 //! Simple test program for UI styling
 
-use nh::ui_style::{Colors, Symbols, Print};
+use ng::ui_style::{Colors, Symbols, Print};
 
 fn main() {
     println!("Testing UI styling...");

@@ -16,7 +16,7 @@ let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
 in
 rustPlatform.buildRustPackage {
-  pname = "nh";
+  pname = "ng"; # Renamed from nh
   version = "${cargoToml.package.version}-${rev}";
 
   src = lib.fileset.toSource {
@@ -26,6 +26,8 @@ rustPlatform.buildRustPackage {
         ./src
         ./Cargo.toml
         ./Cargo.lock
+        ./vendor # Added for vendored dependencies
+        ./.cargo # Added for .cargo/config.toml (from cargo vendor)
       ]
     );
   };
@@ -41,29 +43,29 @@ rustPlatform.buildRustPackage {
 
   preFixup = ''
     mkdir completions
-    $out/bin/nh completions bash > completions/nh.bash
-    $out/bin/nh completions zsh > completions/nh.zsh
-    $out/bin/nh completions fish > completions/nh.fish
+    $out/bin/ng completions bash > completions/ng.bash # Renamed from nh
+    $out/bin/ng completions zsh > completions/ng.zsh   # Renamed from nh
+    $out/bin/ng completions fish > completions/ng.fish # Renamed from nh
 
     installShellCompletion completions/*
   '';
 
   postFixup = ''
-    wrapProgram $out/bin/nh \
+    wrapProgram $out/bin/ng \\ # Renamed from nh
       --prefix PATH : ${lib.makeBinPath runtimeDeps}
   '';
 
   cargoLock.lockFile = ./Cargo.lock;
 
   env = {
-    NH_REV = rev;
+    NG_REV = rev; # Renamed from NH_REV
   };
 
   meta = {
-    description = "Yet another nix cli helper";
-    homepage = "https://github.com/viperML/nh";
+    description = "Yet another nix cli helper (now ng)"; # Updated description
+    homepage = "https://github.com/viperML/nh"; # Consider updating if project moves/renames
     license = lib.licenses.eupl12;
-    mainProgram = "nh";
+    mainProgram = "ng"; # Renamed from nh
     maintainers = with lib.maintainers; [
       drupol
       viperML

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::interface::{Main, OsSubcommand, NHCommand};
+    use crate::interface::{Main, OsSubcommand, NGCommand};
     
     use crate::commands::test_support;
     use clap::Parser;
@@ -29,7 +29,7 @@ mod tests {
 
         let cli = Main::try_parse_from(args_vec.clone()).unwrap_or_else(|e| panic!("Failed to parse OS switch --clean args: {:#?}\nArgs: {:?}", e, args_vec));
         
-        if let NHCommand::Os(os_args) = &cli.command {
+        if let NGCommand::Os(os_args) = &cli.command {
             if let OsSubcommand::Switch(switch_args) = &os_args.subcommand {
                 assert!(switch_args.common.common.dry, "Expected --dry flag to be parsed as true");
                 assert!(!switch_args.common.common.ask, "Expected --no-ask flag to result in ask=false");
@@ -37,7 +37,7 @@ mod tests {
                 panic!("Expected OsSubcommand::Switch for this test case.");
             }
         } else {
-            panic!("Expected NHCommand::Os subcommand after parsing arguments.");
+            panic!("Expected NGCommand::Os subcommand after parsing arguments.");
         }
 
         let run_result = cli.command.run(cli.verbose);

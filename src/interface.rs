@@ -37,12 +37,12 @@ pub struct Main {
     pub verbose: u8,
 
     #[command(subcommand)]
-    pub command: NHCommand,
+    pub command: NGCommand,
 }
 
 #[derive(Subcommand, Debug)]
 #[command(disable_help_subcommand = true)]
-pub enum NHCommand {
+pub enum NGCommand {
     Os(OsArgs),
     Home(HomeArgs),
     Darwin(DarwinArgs),
@@ -52,22 +52,22 @@ pub enum NHCommand {
     Completions(CompletionArgs),
 }
 
-impl NHCommand {
+impl NGCommand {
     pub fn run(self, verbose_count: u8) -> Result<()> {
         match self {
             Self::Os(args) => {
-                std::env::set_var("NH_CURRENT_COMMAND", "os");
+                std::env::set_var("NG_CURRENT_COMMAND", "os");
                 args.run(verbose_count)
             }
             Self::Search(args) => args.run(verbose_count),
             Self::Clean(proxy) => proxy.command.run(verbose_count),
             Self::Completions(args) => args.run(verbose_count),
             Self::Home(args) => {
-                std::env::set_var("NH_CURRENT_COMMAND", "home");
+                std::env::set_var("NG_CURRENT_COMMAND", "home");
                 args.run(verbose_count)
             }
             Self::Darwin(args) => {
-                std::env::set_var("NH_CURRENT_COMMAND", "darwin");
+                std::env::set_var("NG_CURRENT_COMMAND", "darwin");
                 args.run(verbose_count)
             }
         }
@@ -129,7 +129,7 @@ pub struct OsRebuildArgs {
     pub extra_args: Vec<String>,
 
     /// Don't panic if calling nh as root
-    #[arg(short = 'R', long, env = "NH_BYPASS_ROOT_CHECK")]
+    #[arg(short = 'R', long, env = "NG_BYPASS_ROOT_CHECK")]
     pub bypass_root_check: bool,
 }
 
@@ -226,17 +226,17 @@ pub struct SearchArgs {
     #[arg(
         long,
         short,
-        env = "NH_SEARCH_CHANNEL",
+        env = "NG_SEARCH_CHANNEL",
         default_value = "nixos-unstable"
     )]
     /// Name of the channel to query (e.g nixos-23.11, nixos-unstable, etc)
     pub channel: String,
 
-    #[arg(long, short = 'P', env = "NH_SEARCH_PLATFORM", value_parser = clap::builder::BoolishValueParser::new())]
+    #[arg(long, short = 'P', env = "NG_SEARCH_PLATFORM", value_parser = clap::builder::BoolishValueParser::new())]
     /// Show supported platforms for each package
     pub platforms: bool,
 
-    #[arg(long, short = 'j', env = "NH_SEARCH_JSON", value_parser = clap::builder::BoolishValueParser::new())]
+    #[arg(long, short = 'j', env = "NG_SEARCH_JSON", value_parser = clap::builder::BoolishValueParser::new())]
     /// Output results as JSON
     pub json: bool,
 

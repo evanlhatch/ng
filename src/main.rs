@@ -15,41 +15,41 @@ mod ui_style_test;
 use color_eyre::Result;
 // use tracing::debug; // Was used by self_elevate
 
-// Use the library crate `nh` for its modules
-// use nh::interface; // Not used directly, Main is fully qualified
-// use nh::logging; // Not used directly, setup_logging is fully qualified
+// Use the library crate `ng` for its modules
+// use ng::interface; // Not used directly, Main is fully qualified
+// use ng::logging; // Not used directly, setup_logging is fully qualified
 
-const NH_VERSION: &str = env!("CARGO_PKG_VERSION");
-const NH_REV: Option<&str> = option_env!("NH_REV");
+const NG_VERSION: &str = env!("CARGO_PKG_VERSION");
+const NG_REV: Option<&str> = option_env!("NG_REV");
 
 fn main() -> Result<()> {
     let mut do_warn = false;
     if let Ok(f) = std::env::var("FLAKE") {
-        // Set NH_FLAKE if it's not already set
-        if std::env::var("NH_FLAKE").is_err() {
-            std::env::set_var("NH_FLAKE", f);
+        // Set NG_FLAKE if it's not already set
+        if std::env::var("NG_FLAKE").is_err() {
+            std::env::set_var("NG_FLAKE", f);
 
-            // Only warn if FLAKE is set and we're using it to set NH_FLAKE
+            // Only warn if FLAKE is set and we're using it to set NG_FLAKE
             // AND none of the command-specific env vars are set
-            if std::env::var("NH_OS_FLAKE").is_err()
-                && std::env::var("NH_HOME_FLAKE").is_err()
-                && std::env::var("NH_DARWIN_FLAKE").is_err()
+            if std::env::var("NG_OS_FLAKE").is_err()
+                && std::env::var("NG_HOME_FLAKE").is_err()
+                && std::env::var("NG_DARWIN_FLAKE").is_err()
             {
                 do_warn = true;
             }
         }
     }
 
-    let args = <nh::interface::Main as clap::Parser>::parse();
+    let args = <ng::interface::Main as clap::Parser>::parse();
     let verbose_count = args.verbose; // Extract verbosity count
     
-    nh::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
+    ng::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
     tracing::debug!("{args:#?}");
-    tracing::debug!(%NH_VERSION, ?NH_REV);
+    tracing::debug!(%NG_VERSION, ?NG_REV);
 
     if do_warn {
         tracing::warn!(
-            "nh {NH_VERSION} now uses NH_FLAKE instead of FLAKE, please modify your configuration"
+            "ng {NG_VERSION} now uses NG_FLAKE instead of FLAKE, please modify your configuration"
         );
     }
 

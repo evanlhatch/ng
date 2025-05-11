@@ -122,7 +122,7 @@ impl SearchArgs {
                 self.channel
             ))
             .json(&query)
-            .header("User-Agent", format!("nh/{}", crate::NH_VERSION))
+            .header("User-Agent", format!("ng/{}", crate::NG_VERSION))
             // Hardcoded upstream
             // https://github.com/NixOS/nixos-search/blob/744ec58e082a3fcdd741b2c9b0654a0f7fda4603/frontend/src/index.js
             .basic_auth("aWVSALXpZv", Some("X8gPHnzL52wFEekuxsfQ9cSh"))

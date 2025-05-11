@@ -53,8 +53,8 @@ pub mod completion;
 pub use color_eyre::Result;
 
 // Constants and functions from main.rs
-pub const NH_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const NH_REV: Option<&str> = option_env!("NH_REV");
+pub const NG_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const NG_REV: Option<&str> = option_env!("NG_REV");
 
 /// Elevate privileges using sudo
 pub fn self_elevate() -> ! {

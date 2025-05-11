@@ -9,7 +9,7 @@ impl interface::CompletionArgs {
     #[instrument(ret, level = "trace")]
     pub fn run(&self, verbose_count: u8) -> Result<()> {
         let mut cmd = <Main as clap::CommandFactory>::command();
-        generate(self.shell, &mut cmd, "nh", &mut std::io::stdout());
+        generate(self.shell, &mut cmd, "ng", &mut std::io::stdout());
         Ok(())
     }
 }

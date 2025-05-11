@@ -300,7 +300,7 @@ impl PreFlightCheck for NixFormatPreFlightCheck {
                 warn!("  - {}", file_path.display());
             }
             warn!(
-                "Please run '{} <file>' to format them or use 'nh fix format'.",
+                "Please run '{} <file>' to format them or use 'ng fix format'.",
                 formatter_bin
             );
 
@@ -368,17 +368,19 @@ impl PreFlightCheck for ExternalLintersPreFlightCheck {
         {
             ran_any_linter = true;
             info!("Checking for Statix...");
-            if util::command_exists("statix") {
-                // let project_root_path = op_ctx.project_root.as_ref().map_or_else(|| PathBuf::from("."), |p| p.clone()); // Defined above
+            let statix_cmd_name = op_ctx.config.pre_flight.external_linters.statix_path.as_deref().unwrap_or("statix");
+            if util::command_exists(statix_cmd_name) {
                 info!(
                     "Running Statix check on project root: {:?}",
                     project_root_path
                 );
-                let statix_path = op_ctx.config.pre_flight.external_linters.statix_path.as_deref().unwrap_or("statix");
-                let cmd = crate::commands::Command::new(statix_path)
-                    .arg("check")
-                    .arg("--json") // Added --json flag
-                    .arg(&project_root_path);
+                let mut cmd = crate::commands::Command::new(statix_cmd_name);
+                cmd = cmd.arg("check");
+                if let Some(args) = &op_ctx.config.pre_flight.external_linters.statix_args {
+                    cmd = cmd.args(args);
+                }
+                cmd = cmd.arg("--json"); // Ensure JSON output for parsing
+                cmd = cmd.arg(&project_root_path);
 
                 match cmd.run_capture_output() {
                     Ok(output) => {
@@ -495,12 +497,16 @@ impl PreFlightCheck for ExternalLintersPreFlightCheck {
         {
             ran_any_linter = true;
             info!("Checking for Deadnix...");
-            if util::command_exists("deadnix") {
+            let deadnix_cmd_name = op_ctx.config.pre_flight.external_linters.deadnix_path.as_deref().unwrap_or("deadnix");
+            if util::command_exists(deadnix_cmd_name) {
                 info!("Running Deadnix on project root: {:?}", project_root_path);
-                let deadnix_path = op_ctx.config.pre_flight.external_linters.deadnix_path.as_deref().unwrap_or("deadnix");
-                let cmd = crate::commands::Command::new(deadnix_path)
-                    .current_dir(&project_root_path)
-                    .arg("--check");
+                let mut cmd = crate::commands::Command::new(deadnix_cmd_name);
+                cmd = cmd.current_dir(&project_root_path);
+                if let Some(args) = &op_ctx.config.pre_flight.external_linters.deadnix_args {
+                    cmd = cmd.args(args);
+                } else {
+                    cmd = cmd.arg("--check"); // Default argument if none provided
+                }
 
                 match cmd.run_capture_output() {
                     Ok(output) => {

@@ -43,7 +43,7 @@ where
 
         if *level != Level::INFO {
             if let (Some(file), Some(line)) = (metadata.file(), metadata.line()) {
-                write!(writer, " (nh/{}:{})", file, line)?;
+                write!(writer, " (ng/{}:{})", file, line)?;
             }
         }
 
@@ -55,7 +55,7 @@ where
 pub fn setup_logging(verbose_level: u8) -> Result<()> {
     color_eyre::config::HookBuilder::default()
         .display_location_section(true)
-        .panic_section("Please report the bug at https://github.com/viperML/nh/issues")
+        .panic_section("Please report the bug at https://github.com/viperML/ng/issues")
         .display_env_section(false)
         .install()?;
     
@@ -68,7 +68,7 @@ pub fn setup_logging(verbose_level: u8) -> Result<()> {
         .compact()
         .with_line_number(true)
         .with_filter(
-            EnvFilter::from_env("NH_LOG").or(filter_fn(move |meta| {
+            EnvFilter::from_env("NG_LOG").or(filter_fn(move |meta| {
                 let level = *meta.level();
                 (is_debug && level == Level::DEBUG) ||
                 (is_trace && level == Level::TRACE)

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::interface::{Main, NHCommand, OsArgs, OsSubcommand};
+    use crate::interface::{Main, NGCommand, OsArgs, OsSubcommand};
     use crate::installable::Installable; // For asserting Installable fields
     use clap::Parser;
     use std::path::PathBuf;
@@ -18,7 +18,7 @@ mod tests {
         let cli = Main::try_parse_from(args).unwrap_or_else(|e| panic!("Failed to parse basic os switch args: {:?}", e));
         assert_eq!(cli.verbose, 1);
 
-        if let NHCommand::Os(os_args) = cli.command { // Assuming NHCommand is alias for CliCommand
+        if let NGCommand::Os(os_args) = cli.command { // Assuming NHCommand is alias for CliCommand
             if let OsSubcommand::Switch(rebuild_args) = os_args.subcommand {
                 assert_eq!(rebuild_args.hostname.as_deref(), Some("myHost"));
                 assert!(rebuild_args.common.common.no_nom);
@@ -51,7 +51,7 @@ mod tests {
         ];
         let cli = Main::try_parse_from(args).unwrap();
 
-        if let NHCommand::Os(OsArgs { subcommand: OsSubcommand::Switch(rebuild_args) }) = cli.command {
+        if let NGCommand::Os(OsArgs { subcommand: OsSubcommand::Switch(rebuild_args) }) = cli.command {
             assert_eq!(rebuild_args.hostname.as_deref(), Some("overrideHost"));
             
             let common = &rebuild_args.common.common;
@@ -79,13 +79,13 @@ mod tests {
         let args = vec!["nh", "search", "-l", "15", "myQuery", "anotherPart", "--channel", "nixos-23.11"];
         let cli = Main::try_parse_from(args).unwrap();
 
-        if let NHCommand::Search(search_args) = cli.command {
+        if let NGCommand::Search(search_args) = cli.command {
             assert_eq!(search_args.limit, 15);
             assert_eq!(search_args.query, vec!["myQuery", "anotherPart"]);
             assert_eq!(search_args.channel, "nixos-23.11");
             assert_eq!(search_args.platforms, false); // Default
         } else {
-            panic!("Expected NHCommand::Search");
+            panic!("Expected NGCommand::Search");
         }
     }
     
@@ -99,7 +99,7 @@ mod tests {
             assert!(search_args.platforms);
             assert_eq!(search_args.query, vec!["testQuery"]);
         } else {
-            panic!("Expected NHCommand::Search for json/platforms");
+            panic!("Expected NGCommand::Search for json/platforms");
         }
     }
 
@@ -130,7 +130,7 @@ mod tests {
         let args = vec!["nh", "home", "switch", ".#user@host", "--configuration", "user@host", "--backup-extension", "bak"];
         let cli = Main::try_parse_from(args).unwrap();
 
-        if let NHCommand::Home(home_args) = cli.command {
+        if let NGCommand::Home(home_args) = cli.command {
             if let crate::interface::HomeSubcommand::Switch(rebuild_args) = home_args.subcommand {
                 assert_eq!(rebuild_args.configuration.as_deref(), Some("user@host"));
                 assert_eq!(rebuild_args.backup_extension.as_deref(), Some("bak"));
@@ -144,7 +144,7 @@ mod tests {
                 panic!("Expected HomeSubcommand::Switch");
             }
         } else {
-            panic!("Expected NHCommand::Home");
+            panic!("Expected NGCommand::Home");
         }
     }
 

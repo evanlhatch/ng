@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use nh::util::{is_hidden_path, command_exists};
-    use nh::lint::{LintSummary, CheckStatus, LintOutcome}; // Keep these specific to lint
+    use ng::util::{is_hidden_path, command_exists};
+    use ng::lint::{LintSummary, CheckStatus, LintOutcome}; // Keep these specific to lint
     use std::path::Path;
 
     #[test]

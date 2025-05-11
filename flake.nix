@@ -22,11 +22,11 @@
       rev = self.shortRev or self.dirtyShortRev or "dirty";
     in
     {
-      overlays.default = final: prev: { nh = final.callPackage ./package.nix { inherit rev; }; };
+      overlays.default = final: prev: { ng = final.callPackage ./package.nix { inherit rev; }; };
 
       packages = forAllSystems (pkgs: rec {
-        nh = pkgs.callPackage ./package.nix { inherit rev; };
-        default = nh;
+        ng = pkgs.callPackage ./package.nix { inherit rev; };
+        default = ng;
       });
 
       devShells = forAllSystems (pkgs: {

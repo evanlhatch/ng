@@ -1,11 +1,11 @@
-use nh::nix_interface::NixInterface;
-use nh::installable::Installable;
+use ng::nix_interface::NixInterface;
+use ng::installable::Installable;
 use std::path::PathBuf;
 use color_eyre::eyre::Result;
 
 fn main() -> Result<()> {
     // Setup logging
-    nh::logging::setup_logging(2)?;
+    ng::logging::setup_logging(2)?;
     
     println!("Testing NixInterface...");
     

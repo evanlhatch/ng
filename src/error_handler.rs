@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 use regex::Regex;
 // StdCommand, StdProcessOutput, ExitStatusExt removed as create_mock_output is in test module
-use crate::commands::Command as NhCommand;
+use crate::commands::Command as NgCommand;
 use tracing::{error, info}; 
 
 // Define Regexes for parsing error messages
@@ -63,7 +63,7 @@ pub fn fetch_nix_trace(flake_ref: &str, attribute_path_slice: &[String], verbose
     // Construct the full flake reference for the command
     let full_flake_arg = format!("{}#{}", flake_ref, attr_path_str);
 
-    let cmd = NhCommand::new("nix") // Use NhCommand (crate::commands::Command)
+    let cmd = NgCommand::new("nix") // Use NgCommand (crate::commands::Command)
         .args(["eval", &full_flake_arg, "--show-trace"])
         .add_verbosity_flags(verbose_count); // NhCommand's own method
     
@@ -129,7 +129,7 @@ pub fn find_failed_derivations(stderr_summary: &str) -> Vec<String> {
 pub fn fetch_and_format_nix_log(drv_path: &str, verbose_count: u8) -> Result<String> {
     info!("-> Fetching build log for {} using 'nix log'...", drv_path.cyan());
     
-    let cmd = NhCommand::new("nix") // Explicitly use NhCommand
+    let cmd = NgCommand::new("nix") // Explicitly use NgCommand
         .args(["log", drv_path])
         .add_verbosity_flags(verbose_count);
     
@@ -184,7 +184,7 @@ pub fn scan_log_for_recommendations(log_content: &str) -> Vec<String> {
     // If no specific recommendations, add a generic one
     if recommendations.is_empty() {
         recommendations.push("Review the full log for specific error details.".to_string());
-        recommendations.push("Run 'nh doctor' to check your Nix installation.".to_string());
+        recommendations.push("Run 'ng doctor' to check your Nix installation.".to_string());
     }
     
     recommendations
@@ -237,7 +237,7 @@ pub fn report_ng_diagnostics(
 /// * `recommendations` - A list of recommendations to fix the issue.
 pub fn report_failure(stage: &str, reason: &str, details: Option<String>, recommendations: Vec<String>) {
     // Print header with consistent styling
-    eprintln!("\n{}", header(&format!("NH COMMAND ABORTED at Stage: {}", Colors::emphasis(stage.to_string()))));
+    eprintln!("\n{}", header(&format!("NG COMMAND ABORTED at Stage: {}", Colors::emphasis(stage.to_string()))));
     
     // Print reason with improved styling
     error!("{} {}", Symbols::error(), Colors::emphasis(reason.to_string()));
@@ -501,7 +501,7 @@ mod tests {
         let log = "this log has no specific keywords, just a general failure notice.";
         let recs = scan_log_for_recommendations(log);
         assert!(recs.iter().any(|r| r.contains("Review the full log")));
-        assert!(recs.iter().any(|r| r.contains("Run 'nh doctor'")));
+        assert!(recs.iter().any(|r| r.contains("Run 'ng doctor'")));
         assert_eq!(recs.len(), 2);
     }
 
@@ -510,7 +510,7 @@ mod tests {
         let log = "";
         let recs = scan_log_for_recommendations(log);
         assert!(recs.iter().any(|r| r.contains("Review the full log")));
-        assert!(recs.iter().any(|r| r.contains("Run 'nh doctor'")));
+        assert!(recs.iter().any(|r| r.contains("Run 'ng doctor'")));
         assert_eq!(recs.len(), 2);
     }
 

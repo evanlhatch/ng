@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nh::util::{
+    use ng::util::{
         compare_semver, add_verbosity_flags, is_stdout_tty, run_cmd, run_cmd_inherit_stdio,
         UtilCommandError, manage_out_path, run_piped_commands
     };

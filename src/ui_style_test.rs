@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use nh::ui_style::{Colors, Symbols, spinner_message, success_message, separator, header};
+    use ng::ui_style::{Colors, Symbols, spinner_message, success_message, separator, header};
 
     #[test]
     fn test_colors() {
