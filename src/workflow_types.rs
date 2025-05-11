@@ -13,7 +13,10 @@ pub struct CommonRebuildArgs {
     pub no_preflight: bool,
     
     /// Enforce strict linting
-    pub strict_lint: bool,
+    pub strict_lint: Option<bool>, // Changed
+    
+    /// Enforce strict formatting
+    pub strict_format: Option<bool>, // Changed
     
     /// Run medium-level checks
     pub medium_checks: bool, // Renamed from 'medium' for clarity

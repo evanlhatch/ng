@@ -125,8 +125,7 @@ pub struct OsRebuildArgs {
     #[arg(long, short = 'S')]
     pub no_specialisation: bool,
 
-    /// Extra arguments passed to nix build
-    #[arg(last = true)]
+    /// Extra arguments passed to nix build (use '--' to separate if they look like flags)
     pub extra_args: Vec<String>,
 
     /// Don't panic if calling nh as root
@@ -141,8 +140,26 @@ pub struct CommonArgs {
     pub no_preflight: bool,
     
     /// Abort on any lint warning/error (after attempting fixes)
-    #[arg(long, global = true)]
-    pub strict_lint: bool,
+    #[arg(
+        long,
+        global = true,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        value_parser = clap::builder::BoolishValueParser::new(),
+        required = false,
+    )]
+    pub strict_lint: Option<bool>,
+    
+    /// Abort on any formatting issues (after attempting fixes, if applicable)
+    #[arg(
+        long,
+        global = true,
+        num_args = 0..=1,
+        default_missing_value = "true",
+        value_parser = clap::builder::BoolishValueParser::new(),
+        required = false,
+    )]
+    pub strict_format: Option<bool>,
     
     /// Run deeper checks: Nix Eval
     #[arg(long, global = true)]
@@ -156,9 +173,9 @@ pub struct CommonArgs {
     #[arg(long, short = 'n', global = true)]
     pub dry: bool,
     
-    /// Ask for confirmation before activating/committing changes
-    #[arg(long, short, global = true)]
-    pub ask: bool,
+    /// Ask for confirmation before activating/committing changes (default: true)
+    #[arg(long = "no-ask", global = true, default_value_t = true, action = clap::ArgAction::SetFalse, help = "Do not ask for confirmation")]
+    pub ask: bool, // Field is 'ask', true by default. --no-ask flag sets it to false.
     
     /// Don't use nix-output-monitor for the build process
     #[arg(long, global = true)]

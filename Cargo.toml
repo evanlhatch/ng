@@ -61,6 +61,8 @@ walkdir = "2"
 # Dependencies for refactoring (Phase 1.2)
 chumsky = "0.9"
 
+toml = "0.8.12" # Added for ng.toml parsing
+
 # Dependencies for Nix analysis and interaction (from the local nil project)
 syntax = { path = "../nil/crates/syntax" }
 ide = { path = "../nil/crates/ide" }

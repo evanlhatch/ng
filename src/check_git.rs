@@ -5,8 +5,8 @@ use tracing::{debug, info, warn};
 use owo_colors::OwoColorize;
 use crate::ui_style::{Colors, Symbols};
 
-#[cfg(not(test))]
-use crate::util::run_cmd;
+// #[cfg(not(test))]
+// use crate::util::run_cmd; // Removed
 
 /// Checks if the current directory is a Git repository.
 ///
@@ -29,8 +29,8 @@ pub fn is_git_repo() -> bool {
 /// # Returns
 ///
 /// * `Command` - A new Git command.
-pub fn git_command() -> Command {
-    Command::new("git")
+pub fn git_command() -> crate::commands::Command {
+    crate::commands::Command::new("git")
 }
 
 /// Runs a Git check and warns about untracked or modified files that might affect the build.
@@ -51,15 +51,9 @@ pub fn run_git_check_warning_only() -> Result<()> {
     
     // Check for untracked or modified files
     let mut cmd = git_command();
-    cmd.args(["status", "--porcelain=v1"]);
+    cmd = cmd.args(["status", "--porcelain=v1"]); // Reassign
     
-    // Use direct Command execution in test environment to avoid issues with run_cmd
-    #[cfg(test)]
-    let output = cmd.output().context("Failed to run 'git status'")?;
-    
-    // Use run_cmd in non-test environment
-    #[cfg(not(test))]
-    let output = run_cmd(&mut cmd).context("Failed to run 'git status'")?;
+    let output = cmd.run_capture_output().context("Failed to run 'git status'")?;
     
     if !output.status.success() {
         warn!("'git status' command failed. Unable to check for uncommitted files.");
@@ -104,22 +98,16 @@ pub fn run_git_check_warning_only() -> Result<()> {
     // Check if flake.lock is ignored by Git
     if Path::new("flake.lock").exists() {
         let mut ignore_cmd = git_command();
-        ignore_cmd.args(["check-ignore", "-q", "flake.lock"]);
+        ignore_cmd = ignore_cmd.args(["check-ignore", "-q", "flake.lock"]); // Reassign
         
-        // Use direct Command execution in test environment
-        #[cfg(test)]
-        let status_result = ignore_cmd.status();
+        // ignore_cmd.run() will be Ok(()) if 'git check-ignore -q' exits with 0 (ignored)
+        // and Err otherwise.
+        let is_ignored = ignore_cmd.run().is_ok();
         
-        // Use run_cmd in non-test environment
-        #[cfg(not(test))]
-        let status_result = ignore_cmd.status();
-        
-        if let Ok(status) = status_result {
-            if status.success() {
-                warn!("{} Git Warning: {} is ignored by Git (in .gitignore).",
-                    Symbols::warning(),
-                    Colors::code("flake.lock").italic());
-            }
+        if is_ignored {
+            warn!("{} Git Warning: {} is ignored by Git (in .gitignore).",
+                Symbols::warning(),
+                Colors::code("flake.lock").italic());
         }
     }
     

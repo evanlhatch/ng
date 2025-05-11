@@ -88,7 +88,10 @@ impl HomeRebuildArgs {
         if run_preflight {
             let pb = crate::progress::start_spinner("[🎨 Lint] Running formatters and linters...");
             
-            let use_strict_lint = self.common.common.strict_lint || self.common.common.full || self.common.common.medium;
+            let cli_strict_lint = self.common.common.strict_lint;
+            // For home.rs, if CLI is None, this implies false (non-strict) unless overridden by config later (not handled here)
+            // Or, if full/medium checks are on, imply strictness for this specific context.
+            let use_strict_lint = cli_strict_lint.unwrap_or(false) || self.common.common.full || self.common.common.medium;
             
             match crate::lint::run_lint_checks(use_strict_lint, verbose_count) {
                 Ok(lint_summary) => {

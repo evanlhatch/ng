@@ -1,10 +1,10 @@
 use crate::util::{add_verbosity_flags, run_cmd};
 use crate::ui_style::{Colors, Symbols};
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::{Result}; // Removed Context
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::Command; // Restored
+// use std::fs; // Removed
+// use std::path::{Path, PathBuf}; // Removed
 use tracing::{debug, error, info, warn};
 
 /// Status of a check operation.
@@ -91,78 +91,6 @@ impl LintSummary {
 /// # Returns
 ///
 /// * `bool` - True if the command exists, false otherwise.
-pub fn command_exists(cmd: &str) -> bool {
-    // Try to execute the command with --version or --help to check if it exists
-    Command::new(cmd)
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or_else(|_| {
-            // If --version fails, try --help
-            Command::new(cmd)
-                .arg("--help")
-                .output()
-                .map(|output| output.status.success())
-                .unwrap_or(false)
-        })
-}
-
-/// Checks if a path is hidden (starts with a dot).
-///
-/// # Arguments
-///
-/// * `path` - The path to check.
-///
-/// # Returns
-///
-/// * `bool` - True if the path is hidden, false otherwise.
-pub fn is_hidden(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
-}
-
-/// Recursively finds all .nix files in a directory.
-///
-/// # Arguments
-///
-/// * `dir` - The directory to search in.
-/// * `files` - The vector to add found files to.
-///
-/// # Returns
-///
-/// * `Result<()>` - Ok if the search completed successfully, Err otherwise.
-fn find_nix_files_in_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
-    if is_hidden(dir) {
-        return Ok(());
-    }
-    
-    for entry in fs::read_dir(dir).context(format!("Failed to read directory: {}", dir.display()))? {
-        let entry = entry.context("Failed to read directory entry")?;
-        let path = entry.path();
-        
-        if path.is_dir() {
-            find_nix_files_in_dir(&path, files)?;
-        } else if path.is_file() && path.extension().map_or(false, |ext| ext == "nix") {
-            files.push(path);
-        }
-    }
-    
-    Ok(())
-}
-
-/// Finds all .nix files in the current directory and subdirectories.
-///
-/// # Returns
-///
-/// * `Result<Vec<PathBuf>>` - A list of paths to .nix files.
-fn find_nix_files() -> Result<Vec<PathBuf>> {
-    let mut nix_files = Vec::new();
-    find_nix_files_in_dir(Path::new("."), &mut nix_files)?;
-    Ok(nix_files)
-}
-
 /// Runs a formatter fix command.
 ///
 /// # Arguments
@@ -281,7 +209,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     let mut outcome = LintOutcome::Passed;
     
     // Find .nix files
-    let nix_files = find_nix_files()?;
+    let nix_files = crate::util::find_nix_files_walkdir(std::path::Path::new("."))?;
     if nix_files.is_empty() {
         summary.message = "No .nix files found.".to_string();
         summary.outcome = Some(LintOutcome::Passed);
@@ -296,7 +224,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     // --- Formatting ---
     let formatter = ["alejandra", "nixpkgs-fmt", "nixfmt"]
         .into_iter()
-        .find(|cmd| command_exists(cmd));
+        .find(|cmd| crate::util::command_exists(cmd));
     
     if let Some(fmt_cmd) = formatter {
         let check_name = format!("Format ({})", fmt_cmd);
@@ -326,7 +254,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     }
     
     // --- Statix ---
-    if command_exists("statix") {
+    if crate::util::command_exists("statix") {
         info!("{} Running {}", Symbols::info(), Colors::info("Statix"));
         
         // Run statix fix
@@ -349,7 +277,7 @@ pub fn run_lint_checks(strict_mode: bool, verbose_count: u8) -> Result<LintSumma
     }
     
     // --- Deadnix ---
-    if command_exists("deadnix") {
+    if crate::util::command_exists("deadnix") {
         info!("{} Running {}", Symbols::info(), Colors::info("Deadnix"));
         
         // Run deadnix fix

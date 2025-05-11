@@ -1,23 +1,28 @@
 use std::env;
 use std::path::PathBuf;
 
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::bail;
 use tracing::{debug, info, warn};
 
-use crate::commands;
-use crate::commands::Command;
+// use crate::commands::Command; // Removed as per warning
 use crate::installable::Installable;
 use crate::interface::{DarwinArgs, DarwinRebuildArgs, DarwinReplArgs, DarwinSubcommand};
-use crate::nixos::toplevel_for;
-use crate::update::update;
 use crate::util::get_hostname;
-use crate::Result;
+use crate::commands::Command;
+use crate::context::OperationContext; // Added
+use crate::nix_interface::NixInterface; // Added
+use crate::config::NgConfig; // Added
+use std::sync::Arc; // Added
+use crate::workflow_types; // For CommonRebuildArgs mapping
+use crate::darwin_strategy::DarwinPlatformStrategy; // For strategy
+use crate::workflow_executor::execute_rebuild_workflow; // For calling workflow
+use crate::workflow_strategy::ActivationMode; // For specifying activation mode
 
-const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
-const CURRENT_PROFILE: &str = "/run/current-system";
+const _SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system"; // Prefixed
+const _CURRENT_PROFILE: &str = "/run/current-system"; // Prefixed
 
 impl DarwinArgs {
-    pub fn run(self, verbose_count: u8) -> Result<()> {
+    pub fn run(self, verbose_count: u8) -> Result<(), color_eyre::Report> {
         use DarwinRebuildVariant::*;
         match self.subcommand {
             DarwinSubcommand::Switch(args) => args.rebuild(Switch, verbose_count),
@@ -38,7 +43,47 @@ enum DarwinRebuildVariant {
 }
 
 impl DarwinRebuildArgs {
-    fn rebuild(self, variant: DarwinRebuildVariant, verbose_count: u8) -> Result<()> {
+    fn rebuild(self, variant: DarwinRebuildVariant, verbose_count: u8) -> Result<(), color_eyre::Report> {
+        // Create workflow_types::CommonRebuildArgs from self.common (interface::CommonRebuildArgs)
+        let core_common_args = workflow_types::CommonRebuildArgs {
+            installable: self.common.installable.clone(),
+            no_preflight: self.common.common.no_preflight,
+            strict_lint: self.common.common.strict_lint,
+            strict_format: self.common.common.strict_format,
+            medium_checks: self.common.common.medium,
+            full_checks: self.common.common.full,
+            dry_run: self.common.common.dry,
+            ask_confirmation: self.common.common.ask,
+            no_nom: self.common.common.no_nom,
+            out_link: self.common.common.out_link.clone(),
+            clean_after: self.common.common.clean, // Assuming clean is part of CommonArgs
+            extra_build_args: self.extra_args.iter().map(std::ffi::OsString::from).collect(),
+        };
+
+        let nix_interface = NixInterface::new(verbose_count, core_common_args.dry_run);
+        let config = Arc::new(NgConfig::load());
+        let op_ctx = OperationContext::new(
+            core_common_args, 
+            &self.update_args, 
+            verbose_count, 
+            nix_interface, 
+            config, 
+            None // project_root
+        );
+
+        let strategy = DarwinPlatformStrategy;
+        let activation_mode = match variant {
+            DarwinRebuildVariant::Build => ActivationMode::Build,
+            DarwinRebuildVariant::Switch => ActivationMode::Switch,
+        };
+
+        execute_rebuild_workflow(&strategy, &op_ctx, &self, activation_mode)
+    }
+}
+
+    // Legacy rebuild function - kept for reference
+    /*
+    fn rebuild_old(self, variant: DarwinRebuildVariant, verbose_count: u8) -> Result<()> {
         use DarwinRebuildVariant::*;
     
         if nix::unistd::Uid::effective().is_root() {
@@ -391,10 +436,11 @@ impl DarwinRebuildArgs {
         
         Ok(())
     }
-}
+*/
+
 
 impl DarwinReplArgs {
-    fn run(self, _verbose_count: u8) -> Result<()> {
+    fn run(self, _verbose_count: u8) -> Result<(), color_eyre::Report> {
         // Use NH_DARWIN_FLAKE if available, otherwise use the provided installable
         let mut target_installable = if let Ok(darwin_flake) = env::var("NH_DARWIN_FLAKE") {
             debug!("Using NH_DARWIN_FLAKE: {}", darwin_flake);
@@ -440,7 +486,7 @@ impl DarwinReplArgs {
 }
 
 // Helper method to run parallel parse check on all .nix files
-fn run_parallel_parse_check(verbose_count: u8) -> Result<(), String> {
+fn _run_parallel_parse_check(verbose_count: u8) -> Result<(), String> { // Prefixed
     use rayon::prelude::*;
     use walkdir::WalkDir;
     

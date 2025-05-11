@@ -34,26 +34,17 @@ impl PlatformRebuildStrategy for NixosPlatformStrategy {
         let mut final_installable = op_ctx.common_args.installable.clone();
         match &mut final_installable {
             Installable::Flake { reference: _, attribute } => {
-                if attribute.is_empty() { // Only default if user hasn't specified an attribute
+                if attribute.is_empty() { 
                     attribute.push("nixosConfigurations".to_string());
-                    attribute.push(hostname.clone());
-                }
-                // The convention for nixos-rebuild is that the attribute path points to the
-                // NixOS *system derivation* itself, which usually means something like:
-                // nixosConfigurations.<hostname>.config.system.build.toplevel
-                // However, your current `toplevel_for` in `nixos.rs` appends this.
-                // Let's stick to appending it here if attribute is up to hostname.
-                if attribute.last().map_or(false, |a| a == &hostname) {
-                     attribute.extend(vec!["config".to_string(), "system".to_string(), "build".to_string(), "toplevel".to_string()]);
+                    attribute.push(hostname.clone()); 
+                    attribute.extend(vec!["config".to_string(), "system".to_string(), "build".to_string(), "toplevel".to_string()]);
+                } else if attribute.len() == 2 && attribute[0] == "nixosConfigurations" {
+                    // If attribute is like ["nixosConfigurations", "some-host"], then append suffix.
+                    attribute.extend(vec!["config".to_string(), "system".to_string(), "build".to_string(), "toplevel".to_string()]);
                 }
                 // TODO: Handle platform_args.specialisation and platform_args.no_specialisation here
-                // to adjust the attribute path if a specialisation is targeted.
-                // e.g., ...nixosConfigurations.myhost.specialisations.myspec.config.system.build.toplevel
             }
             Installable::File { attribute: _, .. } | Installable::Expression { attribute: _, .. } => {
-                // For file/expr, if attr is empty, it implies the whole file/expr is the system derivation.
-                // If attr is provided, it should point to the system derivation.
-                // No automatic "toplevel" appending here unless it's a common pattern for your non-flake usage.
             }
             Installable::Store { .. } => { /* Store path is already a toplevel */ }
         }

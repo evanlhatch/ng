@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn test_git_command() {
         let cmd = git_command();
-        assert_eq!(cmd.get_program(), "git");
+        assert_eq!(cmd.get_command_name(), std::ffi::OsStr::new("git"));
     }
 
     #[test]

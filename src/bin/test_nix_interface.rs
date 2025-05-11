@@ -10,7 +10,8 @@ fn main() -> Result<()> {
     println!("Testing NixInterface...");
     
     // Create a NixInterface
-    let _nix_interface = NixInterface::new(2);
+    let dry_run_for_test = true; // Example: test in dry_run mode
+    let _nix_interface = NixInterface::new(2, dry_run_for_test);
     
     // Create a simple installable
     let installable = Installable::Flake {

@@ -1,12 +1,14 @@
-use crate::util::{add_verbosity_flags, run_cmd};
-use crate::ui_style::{Colors, Symbols, separator, header};
-use crate::nix_analyzer::{NixAnalysisContext, NgDiagnostic}; // Removed NgSeverity
-use color_eyre::eyre::{Context, Result};
+use crate::ui_style::{header, separator, Colors, Symbols}; // Added separator back
+use crate::nix_analyzer::{NixAnalysisContext, NgDiagnostic};
+use color_eyre::eyre::{Result, eyre}; // Removed Context
 use lazy_static::lazy_static;
 use owo_colors::OwoColorize;
 use regex::Regex;
-use std::process::Command;
-use tracing::{error, info}; // Removed debug
+// StdCommand, StdProcessOutput, ExitStatusExt removed as create_mock_output is in test module
+use crate::commands::Command as NhCommand;
+use tracing::{error, info}; 
+
+// Define Regexes for parsing error messages
 
 // Define Regexes for parsing error messages
 lazy_static! {
@@ -55,24 +57,47 @@ pub fn parse_nix_eval_error(stderr: &str) -> Option<(String, String, usize, usiz
 ///
 /// * `Result<String>` - The trace output or an error.
 pub fn fetch_nix_trace(flake_ref: &str, attribute_path_slice: &[String], verbose_count: u8) -> Result<String> {
-    info!("-> Attempting to fetch evaluation trace for {}#{}...", flake_ref, attribute_path_slice.join("."));
+    let attr_path_str = attribute_path_slice.join("."); // Used for info and final arg
+    info!("-> Attempting to fetch evaluation trace for {}#{}...", flake_ref, attr_path_str);
     
-    let mut cmd = Command::new("nix");
-    cmd.arg("eval");
-    cmd.arg("--show-trace");
-    
-    // Add verbosity flags
-    add_verbosity_flags(&mut cmd, verbose_count);
-    
-    // Add flake reference and attribute path
-    let attr_path = format!("{}#{}", flake_ref, attribute_path_slice.join("."));
-    cmd.arg(attr_path);
+    // Construct the full flake reference for the command
+    let full_flake_arg = format!("{}#{}", flake_ref, attr_path_str);
+
+    let cmd = NhCommand::new("nix") // Use NhCommand (crate::commands::Command)
+        .args(["eval", &full_flake_arg, "--show-trace"])
+        .add_verbosity_flags(verbose_count); // NhCommand's own method
     
     // Run the command and capture output
-    let output = run_cmd(&mut cmd)
-        .context("Failed to run nix eval --show-trace")?;
-    
-    Ok(String::from_utf8_lossy(&output.stderr).to_string())
+    match cmd.run_capture_output() { // Use the new method that returns Result<std::process::Output>
+        Ok(output) => {
+            // Nix eval --show-trace usually prints trace to stderr.
+            // It might print the evaluated result to stdout if successful and not an error.
+            let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+            if output.status.success() {
+                // If successful, stderr contains the trace (or might be empty if no trace).
+                // stdout might contain the value, but for --show-trace, stderr is primary for trace.
+                Ok(stderr_str)
+            } else {
+                // If failed, stderr likely contains the error trace.
+                // If stderr is empty, the error might be in stdout or a general failure.
+                if stderr_str.is_empty() {
+                    let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+                    Err(eyre!(
+                        "nix eval --show-trace for {} failed with no stderr. stdout: {}",
+                        full_flake_arg,
+                        stdout_str
+                    ).into())
+                } else {
+                    Err(eyre!(
+                        "nix eval --show-trace for {} failed. Stderr: {}",
+                        full_flake_arg,
+                        stderr_str
+                    ).into())
+                }
+            }
+        }
+        Err(e) => Err(eyre!("Failed to execute nix eval --show-trace for {}: {}", full_flake_arg, e)),
+    }
 }
 
 /// Finds failed derivation paths in Nix build stderr.
@@ -104,33 +129,22 @@ pub fn find_failed_derivations(stderr_summary: &str) -> Vec<String> {
 pub fn fetch_and_format_nix_log(drv_path: &str, verbose_count: u8) -> Result<String> {
     info!("-> Fetching build log for {} using 'nix log'...", drv_path.cyan());
     
-    let mut cmd = Command::new("nix");
-    cmd.args(["log", drv_path]);
-    
-    // Add verbosity flags
-    add_verbosity_flags(&mut cmd, verbose_count);
+    let cmd = NhCommand::new("nix") // Explicitly use NhCommand
+        .args(["log", drv_path])
+        .add_verbosity_flags(verbose_count);
     
     // Run the command and capture output
-    let output = run_cmd(&mut cmd)
-        .context("Failed to run nix log")?;
+    let log_content = match cmd.run_capture()? {
+        Some(stdout) => stdout,
+        None => return Err(eyre!("nix log for {} did not produce stdout", drv_path)),
+    };
     
-    let log_content = String::from_utf8_lossy(&output.stdout).to_string();
-    
-    // Format the log with headers and footers
-    let formatted_log = format!(
-        "{}
-{}
-{}
-{}
-{}",
-        Colors::warning("─".repeat(80)),
-        Colors::warning(format!(" BUILD LOG FOR: {} ", Colors::emphasis(drv_path.to_string()))),
-        Colors::warning("─".repeat(80)),
-        log_content.trim(),
-        Colors::warning("─".repeat(80)),
-    );
-    
-    Ok(formatted_log)
+    // Format the log with ui_style::header
+    Ok(format!(
+        "{}\n{}", // header() already includes top and bottom separators
+        header(&format!("BUILD LOG FOR: {}", drv_path.bold())),
+        log_content.trim()
+    ))
 }
 
 /// Scans a log for common issues and provides recommendations.
@@ -180,7 +194,7 @@ pub fn scan_log_for_recommendations(log_content: &str) -> Vec<String> {
 pub fn report_ng_diagnostics(
     check_name: &str,
     diagnostics: &[NgDiagnostic],
-    _analyzer_context: &NixAnalysisContext, // Analyzer context might be used for more details later
+    _analyzer_context: Option<&NixAnalysisContext>, // Analyzer context might be used for more details later
 ) {
     if diagnostics.is_empty() {
         return;
@@ -193,15 +207,23 @@ pub fn report_ng_diagnostics(
             crate::nix_analyzer::NgSeverity::Error => "Error".red().bold().to_string(),
             crate::nix_analyzer::NgSeverity::Warning => "Warning".yellow().bold().to_string(),
         };
+        
+        let location_str = if let (Some(line), Some(col)) = (diag.line, diag.column) {
+            format!("{}:{}:{}", diag.file_path.display(), line, col)
+        } else if let Some(line) = diag.line {
+            format!("{}:{}", diag.file_path.display(), line)
+        } else {
+            format!("{}", diag.file_path.display())
+        };
+
         let output_str = format!(
-            "  [{}] {}:{:#?} - {}",
+            "  [{}] {} - {}",
             severity_str,
-            diag.file_path.display(),
-            diag.range.start(), // Just showing start offset for simplicity. TODO: Convert to line/col
+            location_str,
             diag.message
         );
         eprintln!("{}", output_str);
-        // TODO: Print code snippet using diag.range and analyzer_context to fetch file content (if available and not too complex)
+        // TODO: Print code snippet (requires file content access via NgDiagnostic or context)
     }
     eprintln!(); // Add a blank line for spacing
 }
@@ -341,4 +363,378 @@ pub fn generate_syntax_error_recommendations(error_details: &str) -> Vec<String>
     recommendations.push("Consider using a Nix formatter like 'alejandra' or 'nixpkgs-fmt' to automatically fix formatting issues".to_string());
     
     recommendations
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*; // Import functions from outer module
+    use crate::commands::test_support;
+     // For create_mock_output
+     // For create_mock_output
+     // For create_mock_output
+    use color_eyre::eyre::eyre; // For create_mock_output in case of error from set_mock_process_output
+
+    #[test]
+    fn test_parse_nix_eval_error_valid() {
+        let stderr = "error: attribute 'services.nonexistent' not found at /path/to/flake.nix:10:5 some other text";
+        let expected = Some((
+            "attribute 'services.nonexistent' not found".to_string(),
+            "/path/to/flake.nix".to_string(),
+            10,
+            5,
+        ));
+        assert_eq!(parse_nix_eval_error(stderr), expected);
+    }
+
+    #[test]
+    fn test_parse_nix_eval_error_no_match() {
+        let stderr = "this is just some normal output";
+        assert_eq!(parse_nix_eval_error(stderr), None);
+    }
+
+    #[test]
+    fn test_parse_nix_eval_error_malformed_location() {
+        let stderr = "error: some problem at file:not_a_line:col";
+        assert_eq!(parse_nix_eval_error(stderr), None); // Regex should fail to capture digits for line/col
+    }
+
+    #[test]
+    fn test_parse_nix_eval_error_empty_string() {
+        let stderr = "";
+        assert_eq!(parse_nix_eval_error(stderr), None);
+    }
+
+    #[test]
+    fn test_parse_nix_eval_error_different_message() {
+        let stderr = "error: undefined variable 'foobar' at /tmp/test.nix:1:1";
+        let expected = Some((
+            "undefined variable 'foobar'".to_string(),
+            "/tmp/test.nix".to_string(),
+            1,
+            1,
+        ));
+        assert_eq!(parse_nix_eval_error(stderr), expected);
+    }
+
+    #[test]
+    fn test_find_failed_derivations_single() {
+        let stderr = "some preliminary output\nerror: builder for '/nix/store/abcd-foo.drv' failed with exit code 1\nmore output";
+        let expected = vec!["/nix/store/abcd-foo.drv".to_string()];
+        assert_eq!(find_failed_derivations(stderr), expected);
+    }
+
+    #[test]
+    fn test_find_failed_derivations_multiple() {
+        let stderr = "error: builder for '/nix/store/abcd-foo.drv' failed\nstuff in between\nerror: builder for '/nix/store/efgh-bar.drv' failed again";
+        let expected = vec!["/nix/store/abcd-foo.drv".to_string(), "/nix/store/efgh-bar.drv".to_string()];
+        assert_eq!(find_failed_derivations(stderr), expected);
+    }
+
+    #[test]
+    fn test_find_failed_derivations_none() {
+        let stderr = "everything is fine, no builder failed";
+        let expected: Vec<String> = vec![];
+        assert_eq!(find_failed_derivations(stderr), expected);
+    }
+
+    #[test]
+    fn test_find_failed_derivations_empty_string() {
+        let stderr = "";
+        let expected: Vec<String> = vec![];
+        assert_eq!(find_failed_derivations(stderr), expected);
+    }
+
+    #[test]
+    fn test_find_failed_derivations_similar_no_match() {
+        let stderr = "error: builder for some-other-thing failed";
+        let expected: Vec<String> = vec![];
+        assert_eq!(find_failed_derivations(stderr), expected);
+    }
+
+    #[test]
+    fn test_scan_log_missing_package() {
+        let log = "some log output... package 'openssl' not found ... more logs";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("package dependency appears to be missing")));
+    }
+
+    #[test]
+    fn test_scan_log_permission_denied() {
+        let log = "Error: permission denied while trying to access /nix/store";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("Permission errors detected")));
+    }
+
+    #[test]
+    fn test_scan_log_network_error() {
+        let log = "failed to download ... connection timed out ... blah";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("Network-related errors detected")));
+    }
+
+    #[test]
+    fn test_scan_log_attribute_error() {
+        let log = "error: attribute 'system' missing at /flake.nix:10:1";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("attribute error was detected")));
+    }
+
+    #[test]
+    fn test_scan_log_syntax_error_keyword() {
+        let log = "there is a syntax error in your configuration";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("Syntax errors detected")));
+    }
+
+    #[test]
+    fn test_scan_log_multiple_issues() {
+        let log = "package not found, also error: attribute 'foo' missing, and permission denied";
+        let recs = scan_log_for_recommendations(log);
+        assert_eq!(recs.len(), 3); // Missing package, attribute error, permission error
+        assert!(recs.iter().any(|r| r.contains("package dependency")));
+        assert!(recs.iter().any(|r| r.contains("attribute error")));
+        assert!(recs.iter().any(|r| r.contains("Permission errors")));
+    }
+
+    #[test]
+    fn test_scan_log_no_specific_issues() {
+        let log = "this log has no specific keywords, just a general failure notice.";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("Review the full log")));
+        assert!(recs.iter().any(|r| r.contains("Run 'nh doctor'")));
+        assert_eq!(recs.len(), 2);
+    }
+
+    #[test]
+    fn test_scan_log_empty_log() {
+        let log = "";
+        let recs = scan_log_for_recommendations(log);
+        assert!(recs.iter().any(|r| r.contains("Review the full log")));
+        assert!(recs.iter().any(|r| r.contains("Run 'nh doctor'")));
+        assert_eq!(recs.len(), 2);
+    }
+
+    #[test]
+    fn test_enhance_syntax_error_output_typical() {
+        let error_details = "Error in /path/to/my/file.nix: \nerror: syntax error, unexpected ID, expecting SEMI or INHERIT at /path/to/my/file.nix:10:5\n\n   10|     some_attr = value: another_attr;
+      |     ^";
+        let enhanced = enhance_syntax_error_output(error_details);
+        // Basic checks: contains file path, error, snippet parts. Coloring/symbols make exact match hard.
+        assert!(enhanced.contains("/path/to/my/file.nix"));
+        assert!(enhanced.contains("syntax error, unexpected ID"));
+        assert!(enhanced.contains("some_attr = value"));
+        assert!(enhanced.contains("^"));
+    }
+
+    #[test]
+    fn test_enhance_syntax_error_output_no_match() {
+        let error_details = "a generic build error, not a syntax error from nix-instantiate --parse";
+        let enhanced = enhance_syntax_error_output(error_details);
+        // Should return the string mostly as-is, with newlines normalized perhaps.
+        assert!(enhanced.contains(error_details));
+    }
+
+    #[test]
+    fn test_enhance_syntax_error_output_empty() {
+        let error_details = "";
+        let enhanced = enhance_syntax_error_output(error_details);
+        assert_eq!(enhanced.trim(), ""); // Expect empty or just whitespace
+    }
+
+    #[test]
+    fn test_enhance_syntax_error_output_multiple_files() {
+        let error_details = "Error in file1.nix: \nerror: syntax error at file1.nix:1:1\n\nError in file2.nix: \nerror: syntax error at file2.nix:2:2";
+        let enhanced = enhance_syntax_error_output(error_details);
+        assert!(enhanced.contains("file1.nix"));
+        assert!(enhanced.contains("file2.nix"));
+        assert_eq!(enhanced.matches("Error in ").count(), 0); // Corrected: "Error in " should be removed
+    }
+
+    #[test]
+    fn test_generate_recommendations_missing_brace() {
+        let details = "error: syntax error, unexpected end of file, expecting } at /flake.nix:10:1";
+        let recs = generate_syntax_error_recommendations(details);
+        assert!(recs.iter().any(|r| r.contains("Add missing closing brace '}'")));
+        assert!(recs.iter().any(|r| r.contains("Nix formatter"))); // General recommendation
+    }
+
+    #[test]
+    fn test_generate_recommendations_unexpected_semicolon() {
+        let details = "error: syntax error, unexpected ;, expecting end of file at /flake.nix:5:2";
+        let recs = generate_syntax_error_recommendations(details);
+        assert!(recs.iter().any(|r| r.contains("Remove extra semicolon")));
+    }
+
+    #[test]
+    fn test_generate_recommendations_unexpected_equals() {
+        let details = "error: syntax error, unexpected = at /flake.nix:3:4";
+        let recs = generate_syntax_error_recommendations(details);
+        assert!(recs.iter().any(|r| r.contains("Check attribute name before '='")));
+    }
+
+    #[test]
+    fn test_generate_recommendations_generic_error() {
+        let details = "error: some other syntax problem not specifically handled";
+        let recs = generate_syntax_error_recommendations(details);
+        assert!(recs.iter().any(|r| r.contains("Fix the syntax error according to the error message")));
+        assert!(recs.iter().any(|r| r.contains("Nix formatter")));
+        assert_eq!(recs.len(), 2);
+    }
+
+    // Tests for fetch_and_format_nix_log
+    #[test]
+    fn test_fetch_log_success() {
+        test_support::enable_test_mode();
+        let expected_log_raw = "This is the nix log output.".to_string();
+        test_support::set_mock_capture_stdout(expected_log_raw.clone());
+        
+        let drv_path = "/nix/store/some-drv";
+        let result = fetch_and_format_nix_log(drv_path, 0);
+        
+        use crate::ui_style::header; // Only header is directly used now
+        use owo_colors::OwoColorize;
+
+        // Expected format: header output (which includes its own separators) followed by the log content.
+        let expected_formatted_log = format!(
+            "{}\n{}",
+            header(&format!("BUILD LOG FOR: {}", drv_path.bold())),
+            expected_log_raw.trim()
+        );
+
+        assert!(result.is_ok(), "fetch_and_format_nix_log failed: {:?}", result.err());
+        assert_eq!(result.unwrap(), expected_formatted_log);
+        let recorded_commands = test_support::get_recorded_commands();
+        assert_eq!(recorded_commands.len(), 1, "Expected exactly one command to be recorded in this test");
+        let cmd_to_check = recorded_commands.first().expect("No command was recorded").clone();
+        assert!(cmd_to_check.contains(&format!("nix log {}", drv_path)));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_log_command_fails() {
+        test_support::enable_test_mode();
+        test_support::set_mock_capture_error("nix log command failed".to_string());
+
+        let result = fetch_and_format_nix_log("/nix/store/some-drv", 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("nix log command failed"));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_log_no_stdout() {
+        test_support::enable_test_mode();
+        // set_mock_capture_stdout with an empty string or rely on default None
+        // get_mock_capture_result returns Ok(None) if MOCK_CAPTURE_STDOUT is None and MOCK_CAPTURE_ERROR is None
+        // So, just ensure MOCK_CAPTURE_STDOUT is None (enable_test_mode resets it to None)
+
+        let result = fetch_and_format_nix_log("/nix/store/some-drv", 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("did not produce stdout"));
+        test_support::disable_test_mode();
+    }
+
+    // Tests for fetch_nix_trace
+    fn create_mock_output(status_code: i32, stdout: &str, stderr: &str) -> Result<std::process::Output> {
+        #[cfg(unix)]
+        let status = std::os::unix::process::ExitStatusExt::from_raw(status_code);
+        #[cfg(not(unix))]
+        let status = {
+            // Create a real ExitStatus for success or failure for non-unix
+            let mut cmd = if status_code == 0 {
+                std::process::Command::new("cmd") // or sh for general non-windows unix
+                    .arg("/C")
+                    .arg("exit 0")
+            } else {
+                std::process::Command::new("cmd")
+                    .arg("/C")
+                    .arg(format!("exit {}", status_code))
+            };
+            cmd.status().expect("Failed to create mock ExitStatus")
+        };
+
+        Ok(std::process::Output {
+            status,
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: stderr.as_bytes().to_vec(),
+        })
+    }
+
+    #[test]
+    fn test_fetch_trace_success_with_stderr() {
+        test_support::enable_test_mode();
+        let expected_trace = "this is the trace on stderr".to_string();
+        test_support::set_mock_process_output(create_mock_output(0, "stdout content", &expected_trace));
+        
+        let result = fetch_nix_trace("flake_ref", &["attr".to_string()], 0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), expected_trace);
+        let recorded_commands = test_support::get_recorded_commands();
+        assert_eq!(recorded_commands.len(), 1, "Expected exactly one command to be recorded in this test");
+        let cmd_to_check = recorded_commands.first().expect("No command was recorded").clone();
+        assert!(cmd_to_check.contains("nix eval flake_ref#attr --show-trace"));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_trace_success_empty_stderr_uses_stdout() {
+        test_support::enable_test_mode();
+        // This case was in fetch_nix_trace logic previously, let's ensure it's handled.
+        // The refactored fetch_nix_trace now prioritizes stderr if status.success().
+        // If stderr is empty on success, it still returns empty stderr.
+        let expected_stdout_if_stderr_empty_on_success = "evaluated value".to_string();
+        test_support::set_mock_process_output(create_mock_output(0, &expected_stdout_if_stderr_empty_on_success, ""));
+
+        let result = fetch_nix_trace("flake_ref", &["attr".to_string()], 0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ""); // Expects empty stderr now
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_trace_command_fails_with_stderr() {
+        test_support::enable_test_mode();
+        let error_output = "error trace on stderr".to_string();
+        test_support::set_mock_process_output(create_mock_output(1, "some stdout", &error_output));
+        
+        let result = fetch_nix_trace("flake_ref", &["attr".to_string()], 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains(&error_output));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_trace_command_fails_empty_stderr_uses_stdout() {
+        test_support::enable_test_mode();
+        let stdout_content = "failure info on stdout".to_string();
+        test_support::set_mock_process_output(create_mock_output(1, &stdout_content, ""));
+
+        let result = fetch_nix_trace("flake_ref", &["attr".to_string()], 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains(&format!("failed with no stderr. stdout: {}", stdout_content)));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_fetch_trace_underlying_command_execution_error() {
+        test_support::enable_test_mode();
+        let exec_error_msg = "Failed to execute nix eval itself".to_string();
+        // This simulates an error from cmd.run_capture_output() itself, not a Nix error.
+        test_support::set_mock_process_output(Err(eyre!(exec_error_msg.clone())));
+
+        let result = fetch_nix_trace("flake_ref", &["attr".to_string()], 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains(&exec_error_msg));
+        test_support::disable_test_mode();
+    }
+
+    #[test]
+    fn test_generate_recommendations_empty_details() {
+        let details = "";
+        let recs = generate_syntax_error_recommendations(details);
+        // Should still give generic advice if details are empty but function is called
+        assert!(recs.iter().any(|r| r.contains("Fix the syntax error according to the error message")));
+        assert!(recs.iter().any(|r| r.contains("Nix formatter")));
+        assert_eq!(recs.len(), 2);
+    }
 }

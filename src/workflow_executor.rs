@@ -150,26 +150,33 @@ pub fn execute_rebuild_workflow<S: PlatformRebuildStrategy>(
 
     // 5. Build Configuration
     let out_path_manager = util::manage_out_path(op_ctx.common_args.out_link.as_ref())?;
-    let built_profile_path: PathBuf; // Actual path to the /nix/store derivation
+    let built_profile_path: PathBuf;
 
-    if op_ctx.common_args.dry_run && activation_mode == ActivationMode::Build {
-        info!("Dry-run build-only mode: Simulating build for {:?}. Output would be at {}.",
-            &toplevel_installable.to_args(),
-            out_path_manager.get_path().display()
-        );
-        // For a pure dry-run build, we don't actually build or have a real result path.
-        // Subsequent steps like diff/activate will be skipped anyway.
-        built_profile_path = PathBuf::from("/dry_run_build_no_actual_path"); // Placeholder
+    // Always call build_configuration; it's dry-run aware internally.
+    // NixInterface::build_configuration will call cmd.run() on a dry command (which records in test mode),
+    // and for its dry_run mode, it should return a conventional/placeholder PathBuf.
+    let result_from_build_config: PathBuf = op_ctx.nix_interface.build_configuration(
+        &toplevel_installable,
+        &op_ctx.common_args.extra_build_args,
+        op_ctx.common_args.no_nom,
+        Some(out_path_manager.get_path()), // Pass out_link as Option
+    )?;
+
+    if op_ctx.common_args.dry_run {
+        // build_configuration was called in its dry_run mode.
+        // The returned `result_from_build_config` is likely a conventional placeholder.
+        // Subsequent steps (diff, activate) are skipped anyway in the broader dry_run context of this workflow.
+        if activation_mode == ActivationMode::Build {
+            info!("Dry-run build-only mode: Build command (dry) logged. Using placeholder profile path: {}", result_from_build_config.display());
+        } else { // Dry run for switch, boot etc.
+            info!("Dry-run mode: Build command (dry) logged for {}. Using placeholder profile path: {}",
+                platform_strategy.name(), result_from_build_config.display());
+        }
+        built_profile_path = result_from_build_config; // Use the path (even if placeholder) from build_configuration
     } else {
-        // Use NixInterface to build the configuration
-        built_profile_path = op_ctx.nix_interface.build_configuration(
-            &toplevel_installable,
-            &op_ctx.common_args.extra_build_args,
-            op_ctx.common_args.no_nom,
-            Some(out_path_manager.get_path()), // Pass out_link as Option
-        )?;
+        // Not a general dry_run for the workflow: use the actual built profile path.
+        built_profile_path = result_from_build_config;
     }
-
 
     // 6. Show Diff
     if activation_mode != ActivationMode::Build && !op_ctx.common_args.dry_run {

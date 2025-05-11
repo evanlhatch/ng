@@ -78,4 +78,10 @@ run_test "Error reporting" "cargo run --bin nh -- -v os --dry 2>&1 | grep -q 'CO
 # Clean up
 rm -f error_test.nix
 
-echo -e "${BLUE}=== All tests completed ===${NC}"
+# Test 7: No formatters found
+if ! command -v nixpkgs-fmt >/dev/null && ! command -v alejandra >/dev/null && ! command -v nixfmt >/dev/null; then
+    run_test "No formatters found" "cargo run --bin nh -- -v os --dry 2>&1 | grep -q 'No Nix formatter found'"
+else
+    echo -e "${YELLOW}Skipping no formatters test (formatters are available)${NC}"
+    echo
+fi

@@ -22,6 +22,8 @@ use crate::workflow_strategy::ActivationMode;
 use crate::context::OperationContext;
 use crate::nix_interface::NixInterface;
 use crate::workflow_types::CommonRebuildArgs;
+use crate::config::NgConfig; // Added
+use std::sync::Arc; // Added
 
 // Constants removed as they were only used in the deleted OsRebuildArgs::rebuild method
 // const SYSTEM_PROFILE: &str = "/nix/var/nix/profiles/system";
@@ -35,6 +37,7 @@ impl OsArgs {
             installable: cli_args.common.installable.clone(),
             no_preflight: cli_args.common.common.no_preflight,
             strict_lint: cli_args.common.common.strict_lint,
+            strict_format: cli_args.common.common.strict_format, // Added
             medium_checks: cli_args.common.common.medium,
             full_checks: cli_args.common.common.full,
             dry_run: cli_args.common.common.dry,
@@ -50,11 +53,15 @@ impl OsArgs {
     fn execute_os_workflow(cli_args: &OsRebuildArgs, verbose_count: u8, activation_mode: ActivationMode) -> Result<()> {
         let core_common_args = Self::create_common_rebuild_args(cli_args);
         
+        let nix_interface = NixInterface::new(verbose_count, cli_args.common.common.dry); // Create this first
+        let config = Arc::new(NgConfig::load()); // Load config
         let op_ctx = OperationContext::new(
-            core_common_args, // Pass by value
+            core_common_args, 
             &cli_args.update_args,
             verbose_count,
-            NixInterface::new(verbose_count),
+            nix_interface,
+            config,
+            None, // project_root is None for normal runs
         );
         
         let strategy = NixosPlatformStrategy;

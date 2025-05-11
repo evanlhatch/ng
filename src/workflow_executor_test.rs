@@ -8,6 +8,8 @@ mod tests {
     use crate::Result;
     use std::path::{Path, PathBuf};
     use std::ffi::OsString;
+    use std::sync::Arc; // Added for Arc<NgConfig>
+    use crate::config::NgConfig; // Added for NgConfig::default()
 
     // Mock platform strategy for testing
     struct MockPlatformStrategy;
@@ -76,7 +78,8 @@ mod tests {
         let common_args = CommonRebuildArgs {
             installable,
             no_preflight: true, // Skip preflight for test
-            strict_lint: false,
+            strict_lint: None,
+            strict_format: None, 
             medium_checks: false,
             full_checks: false,
             dry_run: true, // Use dry run for test
@@ -88,12 +91,15 @@ mod tests {
         };
 
         // Create operation context
-        let nix_interface = crate::nix_interface::NixInterface::new(0);
+        let dry_run_for_test = true; // Or common_args.dry_run if common_args is accessible here for this decision
+        let nix_interface = crate::nix_interface::NixInterface::new(0, dry_run_for_test);
         let op_ctx = OperationContext::new(
             common_args, // Pass by value
             &update_args,
             0, // verbose_count
             nix_interface,
+            Arc::new(NgConfig::default()), // Added config
+            None, // Added project_root
         );
 
         // Create mock platform args

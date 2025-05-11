@@ -13,10 +13,13 @@ pub mod context;
 pub mod workflow_strategy;
 pub mod workflow_executor;
 pub mod nixos_strategy;
+pub mod darwin_strategy; // Added
 // Phase 3: Implementing nil integration
 pub mod nix_analyzer;
 pub mod pre_flight;
+pub mod external_linter_types; // Added
 pub mod nix_interface; // Now with real implementation
+pub mod config; // Added
 
 #[cfg(test)]
 mod workflow_executor_test;
@@ -24,6 +27,12 @@ mod workflow_executor_test;
 mod nixos_strategy_test;
 #[cfg(test)]
 mod installable_test;
+#[cfg(test)]
+mod interface_test;
+#[cfg(test)]
+mod nixos_test; // Added for nixos workflow tests
+#[cfg(test)]
+mod config_test; // Added
 
 // Existing modules
 pub mod commands;

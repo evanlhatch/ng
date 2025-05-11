@@ -1,16 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use nh::lint::{is_hidden, command_exists, LintSummary, CheckStatus, LintOutcome};
+    use nh::util::{is_hidden_path, command_exists};
+    use nh::lint::{LintSummary, CheckStatus, LintOutcome}; // Keep these specific to lint
     use std::path::Path;
 
     #[test]
     fn test_is_hidden() {
-        assert!(is_hidden(Path::new(".hidden_file")));
-        // The is_hidden function only checks if the file/dir name itself starts with a dot,
-        // not if any parent directory is hidden
-        assert!(!is_hidden(Path::new(".hidden_dir/file.txt")));
-        assert!(!is_hidden(Path::new("visible_file.txt")));
-        assert!(!is_hidden(Path::new("visible_dir/file.txt")));
+        assert!(is_hidden_path(Path::new(".hidden_file")));
+        assert!(!is_hidden_path(Path::new(".hidden_dir/file.txt")));
+        assert!(!is_hidden_path(Path::new("visible_file.txt")));
+        assert!(!is_hidden_path(Path::new("visible_dir/file.txt")));
     }
 
     #[test]

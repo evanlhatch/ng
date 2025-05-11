@@ -56,3 +56,41 @@ pub trait PlatformRebuildStrategy {
     // Optional: For platform-specific pre-flight checks that don't fit the shared model.
     // fn platform_specific_pre_flight_checks(&self, op_ctx: &OperationContext, platform_args: &Self::PlatformArgs) -> Result<()>;
 }
+
+
+#[cfg(test)]
+#[derive(Debug)]
+pub struct MockPlatformStrategy;
+
+#[cfg(test)]
+impl PlatformRebuildStrategy for MockPlatformStrategy {
+    type PlatformArgs = (); // Simple unit type for args if not needed
+
+    fn name(&self) -> &str { "MockPlatform" }
+    fn pre_rebuild_hook(&self, _op_ctx: &OperationContext, _platform_args: &Self::PlatformArgs) -> Result<()> { 
+        // Use tracing::debug or println! for test output if needed
+        // println!("MockPlatform: pre_rebuild_hook called"); 
+        Ok(())
+    }
+    fn get_toplevel_installable(&self, _op_ctx: &OperationContext, _platform_args: &Self::PlatformArgs) -> Result<Installable> {
+        // println!("MockPlatform: get_toplevel_installable called"); 
+        Ok(Installable::Flake { reference: ".#mock".to_string(), attribute: Vec::new() })
+    }
+    fn get_current_profile_path(&self, _op_ctx: &OperationContext, _platform_args: &Self::PlatformArgs) -> Option<PathBuf> {
+        None
+    }
+    fn activate_configuration(
+        &self,
+        _op_ctx: &OperationContext,
+        _platform_args: &Self::PlatformArgs,
+        _built_profile_path: &Path,
+        _activation_mode: &ActivationMode,
+    ) -> Result<()> { 
+        // println!("MockPlatform: activate_configuration called"); 
+        Ok(())
+    }
+    fn post_rebuild_hook(&self, _op_ctx: &OperationContext, _platform_args: &Self::PlatformArgs) -> Result<()> { 
+        // println!("MockPlatform: post_rebuild_hook called"); 
+        Ok(())
+    }
+}

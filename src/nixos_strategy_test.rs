@@ -8,6 +8,8 @@ mod tests {
     use crate::interface::{OsRebuildArgs, CommonRebuildArgs as InterfaceCommonRebuildArgs, CommonArgs, UpdateArgs};
     use std::path::PathBuf;
     use std::ffi::OsString;
+    use std::sync::Arc; // Added for Arc<NgConfig>
+    use crate::config::NgConfig; // Added for NgConfig::default()
 
     // Helper function to create a test OperationContext
     fn create_test_context<'a>(
@@ -18,7 +20,8 @@ mod tests {
         let common_args = CommonRebuildArgs {
             installable,
             no_preflight: true,
-            strict_lint: false,
+            strict_lint: None,
+            strict_format: None,
             medium_checks: false,
             full_checks: false,
             dry_run: true,
@@ -28,12 +31,14 @@ mod tests {
             clean_after: false,
             extra_build_args: Vec::<OsString>::new(),
         };
-        let nix_interface = crate::nix_interface::NixInterface::new(verbose_count);
+        let nix_interface = crate::nix_interface::NixInterface::new(verbose_count, common_args.dry_run);
         OperationContext::new(
             common_args, // Pass by value
             update_args,
             verbose_count,
             nix_interface,
+            Arc::new(NgConfig::default()), // Added config
+            None, // Added project_root
         )
     }
 
@@ -41,7 +46,8 @@ mod tests {
     fn create_test_os_rebuild_args(hostname: Option<String>, bypass_root_check: bool) -> OsRebuildArgs {
         let common_args = CommonArgs {
             no_preflight: true,
-            strict_lint: false,
+            strict_lint: None,
+            strict_format: None,
             medium: false,
             full: false,
             dry: true,

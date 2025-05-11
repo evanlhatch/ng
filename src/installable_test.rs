@@ -28,9 +28,9 @@ fn test_attribute_path_parser() {
     assert_eq!(attribute_path_parser().parse("").unwrap(), Vec::<String>::new());
     
     // Test invalid paths
-    assert!(attribute_path_parser().parse(".foo").is_err());
-    assert!(attribute_path_parser().parse("foo.").is_err());
-    assert!(attribute_path_parser().parse("foo..bar").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse(".foo").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo.").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo..bar").is_err());
 }
 
 // Test the public parse_attribute_robust function with various inputs
@@ -97,9 +97,9 @@ fn test_attribute_path_parser_direct() {
     assert_eq!(attribute_path_parser().parse("").unwrap(), Vec::<String>::new());
     
     // Test invalid paths
-    assert!(attribute_path_parser().parse(".foo").is_err());
-    assert!(attribute_path_parser().parse("foo.").is_err());
-    assert!(attribute_path_parser().parse("foo..bar").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse(".foo").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo.").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo..bar").is_err());
 }
 
 #[test]

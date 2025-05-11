@@ -42,9 +42,9 @@ impl FromArgMatches for Installable {
         // Robust attribute parsing helper
         fn parse_attr_for_installable<S: AsRef<str>>(attr_str: S) -> Vec<String> {
             let attr_s = attr_str.as_ref();
-            parse_attribute_robust(attr_s).unwrap_or_else(|parse_errs| {
-                // Convert chumsky errors to a string or log them
-                let err_msg = parse_errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+            parse_attribute_robust(attr_s).unwrap_or_else(|parse_err| { // parse_err is Simple<char>
+                // Convert chumsky Simple error to a string
+                let err_msg = parse_err.to_string();
                 warn!("Failed to robustly parse attribute '{}': {}. Falling back to simple parsing.", attr_s, err_msg);
                 // Fallback to the old simple parse_attribute
                 parse_attribute(attr_s)
@@ -261,22 +261,31 @@ fn attribute_segment() -> impl Parser<char, String, Error = Simple<char>> {
 }
 
 pub fn attribute_path_parser() -> impl Parser<char, Vec<String>, Error = Simple<char>> {
-    attribute_segment()
+    // Non-empty path: must start with a segment, then dot-separated segments
+    let non_empty_path = attribute_segment()
         .separated_by(just('.'))
-        .at_least(0) // To handle empty string correctly
-        .collect()
+        .at_least(1) // Must have at least one segment
+        .collect::<Vec<String>>();
+
+    // Allow non_empty_path OR an empty parser that yields an empty Vec for genuinely empty input
+    non_empty_path.or(empty().map(|_| Vec::new()))
 }
 
 // New robust parse_attribute function using chumsky
-pub fn parse_attribute_robust<S>(s: S) -> Result<Vec<String>, Vec<Simple<char>>>
+pub fn parse_attribute_robust<S>(s: S) -> Result<Vec<String>, Simple<char>> // Error type changed
 where
     S: AsRef<str>,
 {
-    let s = s.as_ref();
-    if s.is_empty() {
-        return Ok(Vec::new());
-    }
-    attribute_path_parser().parse(s)
+    let s_ref = s.as_ref();
+    // The new attribute_path_parser combined with then_ignore(end()) handles empty string correctly.
+    attribute_path_parser()
+        .then_ignore(end()) // Ensures the whole string is consumed
+        .parse(s_ref)
+        .map_err(|e_vec| { // Chumsky parse returns Vec<Error>, map to a single Simple error
+            // For simplicity, take the first error message if available, or a generic one.
+            let message = e_vec.first().map(|e| e.to_string()).unwrap_or_else(|| format!("Invalid attribute path: '{}'", s_ref));
+            Simple::custom(Default::default(), message)
+        })
 }
 
 // Keep the old parse_attribute for backward compatibility and fallback
@@ -351,7 +360,7 @@ fn test_nix_identifier() {
     // Test invalid identifiers
     assert!(nix_identifier().parse("1a").is_err());
     assert!(nix_identifier().parse(".a").is_err());
-    assert!(nix_identifier().parse("a.b").is_err());
+    assert!(nix_identifier().then_ignore(end()).parse("a.b").is_err());
     assert!(nix_identifier().parse("").is_err());
 }
 
@@ -395,7 +404,7 @@ fn test_attribute_segment() {
     // Test invalid segments
     assert!(attribute_segment().parse("").is_err());
     assert!(attribute_segment().parse("1foo").is_err());
-    assert!(attribute_segment().parse("foo.bar").is_err());
+    assert!(attribute_segment().then_ignore(end()).parse("foo.bar").is_err());
 }
 
 #[test]
@@ -426,9 +435,9 @@ fn test_attribute_path_parser_comprehensive() {
     assert_eq!(attribute_path_parser().parse("").unwrap(), Vec::<String>::new());
     
     // Test invalid paths
-    assert!(attribute_path_parser().parse(".foo").is_err());
-    assert!(attribute_path_parser().parse("foo.").is_err());
-    assert!(attribute_path_parser().parse("foo..bar").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse(".foo").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo.").is_err());
+    assert!(attribute_path_parser().then_ignore(end()).parse("foo..bar").is_err());
 }
 
 impl Installable {
