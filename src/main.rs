@@ -1,57 +1,68 @@
+mod cli; // Assuming your cli module
 
-#[cfg(test)]
-mod error_handler_test;
-#[cfg(test)]
-mod lint_test;
-#[cfg(test)]
-mod check_git_test;
-#[cfg(test)]
-mod progress_test;
-#[cfg(test)]
-mod util_test;
-#[cfg(test)]
-mod ui_style_test;
-
-use color_eyre::Result;
-// use tracing::debug; // Was used by self_elevate
-
-// Use the library crate `ng` for its modules
-// use ng::interface; // Not used directly, Main is fully qualified
-// use ng::logging; // Not used directly, setup_logging is fully qualified
-
-const NG_VERSION: &str = env!("CARGO_PKG_VERSION");
-const NG_REV: Option<&str> = option_env!("NG_REV");
+use cli::{Cli, Commands, FormatArgs}; // Adjust import
+use color_eyre::eyre::{Result, WrapErr};
+use std::env;
+use std::path::PathBuf;
+use std::process::Command;
 
 fn main() -> Result<()> {
-    let mut do_warn = false;
-    if let Ok(f) = std::env::var("FLAKE") {
-        // Set NG_FLAKE if it's not already set
-        if std::env::var("NG_FLAKE").is_err() {
-            std::env::set_var("NG_FLAKE", f);
+    color_eyre::install()?;
+    let cli_args = Cli::parse();
 
-            // Only warn if FLAKE is set and we're using it to set NG_FLAKE
-            // AND none of the command-specific env vars are set
-            if std::env::var("NG_OS_FLAKE").is_err()
-                && std::env::var("NG_HOME_FLAKE").is_err()
-                && std::env::var("NG_DARWIN_FLAKE").is_err()
-            {
-                do_warn = true;
+    // Determine project root
+    let project_root = env::current_dir().wrap_err("Failed to determine current directory")?;
+
+    match cli_args.command {
+        Commands::Format(format_args) => {
+            format_nix_files(&project_root.join(format_args.path), format_args.apply)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn format_nix_files(start_path: &PathBuf, apply: bool) -> Result<()> {
+    // 1. Use walkdir to find all .nix files
+    use walkdir::WalkDir;
+    let walker = WalkDir::new(start_path).into_iter();
+
+    let mut files_to_format = Vec::new();
+    for entry in walker.filter_map(Result::ok) {
+        if entry.file_type().is_file() && entry.path().extension().map_or(false, |ext| ext == "nix") {
+            files_to_format.push(entry.path().to_path_buf());
+        }
+    }
+
+    if files_to_format.is_empty() {
+        println!("No Nix files found in '{}'", start_path.display());
+        return Ok(());
+    }
+
+    // 2. Run nix fmt (or nixfmt-rfc-style) on each file
+    for file_path in &files_to_format {
+        println!("Formatting: {}", file_path.display());
+        let mut cmd = Command::new("nix"); // Or "nixfmt-rfc-style"
+        cmd.arg("fmt").arg(file_path);
+
+        if !apply {
+            cmd.arg("--check"); // Just check if formatting is correct
+        }
+
+        let output = cmd.output().wrap_err_with(|| format!("Failed to execute nix fmt on {}", file_path.display()))?;
+
+        if output.status.success() {
+            if !apply {
+                println!("{} is already formatted correctly.", file_path.display());
+            }
+        } else {
+            eprintln!("{} formatting check failed:", file_path.display());
+            eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            if !apply {
+                eprintln!("Run with --apply to format this file.");
             }
         }
     }
 
-    let args = <ng::interface::Main as clap::Parser>::parse();
-    let verbose_count = args.verbose; // Extract verbosity count
-    
-    ng::logging::setup_logging(verbose_count)?; // Pass the count to setup_logging
-    tracing::debug!("{args:#?}");
-    tracing::debug!(%NG_VERSION, ?NG_REV);
-
-    if do_warn {
-        tracing::warn!(
-            "ng {NG_VERSION} now uses NG_FLAKE instead of FLAKE, please modify your configuration"
-        );
-    }
-
-    args.command.run(verbose_count) // Pass the count to run
+    Ok(())
 }
