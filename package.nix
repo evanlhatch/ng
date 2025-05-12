@@ -35,6 +35,9 @@ rustPlatform.buildRustPackage {
     "--frozen"
   ];
 
+  # Explicitly set CARGO_HOME to ensure cargo can find the config
+  CARGO_HOME = "./.cargo";
+
   preFixup = ''
     mkdir completions
     $out/bin/ng completions bash > completions/ng.bash
@@ -49,11 +52,32 @@ rustPlatform.buildRustPackage {
       --prefix PATH : ${lib.makeBinPath runtimeDeps}
   '';
 
-  # Tell Nix to use the vendored dependencies
-  cargoVendorDir = ./vendor;
-  
   # Skip the vendoring phase since we already have the vendor directory
   dontCargoVendor = true;
+  
+  # Skip the cargo fetch phase
+  dontCargoFetch = true;
+  
+  # Skip the cargo check phase
+  dontCargoCheck = true;
+  
+  # Copy the vendor directory and .cargo config to the build directory
+  preBuild = ''
+    echo "--- Contents of vendor directory (top level):"
+    ls -l vendor || true
+
+    echo "--- Contents of vendor/builtin directory:"
+    ls -l vendor/builtin || true # Check if Cargo.toml is listed here
+
+    echo "--- Contents of .cargo directory:"
+    ls -l .cargo || true
+
+    echo "--- Attempting to cat vendor/builtin/Cargo.toml:"
+    cat vendor/builtin/Cargo.toml || echo "cat vendor/builtin/Cargo.toml FAILED" # Try to display it
+    
+    echo "--- Attempting to cat .cargo/config.toml:"
+    cat .cargo/config.toml || echo "cat .cargo/config.toml FAILED" # Try to display it
+  '';
 
   env = {
     NG_REV = rev;
