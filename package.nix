@@ -30,9 +30,9 @@ rustPlatform.buildRustPackage {
 
   buildInputs = lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.SystemConfiguration ];
 
+  # Remove the --frozen flag since we won't be using vendored dependencies
   cargoBuildFlags = [
-    "--frozen"
-  ]; # <--- ADD THESE FLAGS
+  ];
 
   preFixup = ''
     mkdir completions
@@ -48,7 +48,13 @@ rustPlatform.buildRustPackage {
       --prefix PATH : ${lib.makeBinPath runtimeDeps}
   '';
 
-  cargoLock.lockFile = ./Cargo.lock;
+  # Use Nix's built-in dependency fetching
+  cargoLock = {
+    lockFile = ./Cargo.lock;
+    outputHashes = {
+      # This will be filled in by Nix on the first build attempt
+    };
+  };
 
   env = {
     NG_REV = rev;
