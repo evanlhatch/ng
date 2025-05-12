@@ -1,0 +1,66 @@
+SOURCE_FILE@0..50
+  LET_IN@0..50
+    KW_LET@0..3 "let"
+    SPACE@3..4 " "
+    ATTR_PATH_VALUE@4..11
+      ATTR_PATH@4..7
+        NAME@4..6
+          IDENT@4..6 "or"
+        SPACE@6..7 " "
+      EQ@7..8 "="
+      SPACE@8..9 " "
+      LITERAL@9..10
+        INT@9..10 "1"
+      SEMICOLON@10..11 ";"
+    SPACE@11..12 " "
+    KW_IN@12..14 "in"
+    SPACE@14..15 " "
+    BINARY_OP@15..50
+      LIST@15..38
+        L_BRACK@15..16 "["
+        SPACE@16..17 " "
+        SELECT@17..31
+          ATTR_SET@17..20
+            L_CURLY@17..18 "{"
+            SPACE@18..19 " "
+            R_CURLY@19..20 "}"
+          DOT@20..21 "."
+          ATTR_PATH@21..24
+            NAME@21..23
+              IDENT@21..23 "or"
+            SPACE@23..24 " "
+          KW_OR@24..26 "or"
+          APPLY@26..31
+            SPACE@26..27 " "
+            LITERAL@27..28
+              INT@27..28 "1"
+            SPACE@28..29 " "
+            REF@29..31
+              IDENT@29..31 "or"
+        SPACE@31..32 " "
+        APPLY@32..36
+          LITERAL@32..33
+            INT@32..33 "2"
+          SPACE@33..34 " "
+          REF@34..36
+            IDENT@34..36 "or"
+        SPACE@36..37 " "
+        R_BRACK@37..38 "]"
+      SPACE@38..39 " "
+      PLUS@39..40 "+"
+      SPACE@40..41 " "
+      APPLY@41..50
+        APPLY@41..48
+          REF@41..42
+            IDENT@41..42 "f"
+          SPACE@42..43 " "
+          APPLY@43..47
+            REF@43..44
+              IDENT@43..44 "a"
+            SPACE@44..45 " "
+            REF@45..47
+              IDENT@45..47 "or"
+          SPACE@47..48 " "
+        REF@48..49
+          IDENT@48..49 "b"
+        SPACE@49..50 "\n"

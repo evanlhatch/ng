@@ -1,0 +1,5 @@
+5..5: ExpectToken(DQUOTE)
+SOURCE_FILE@0..5
+  STRING@0..5
+    DQUOTE@0..1 "\""
+    STRING_FRAGMENT@1..5 "foo\n"

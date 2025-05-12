@@ -1,0 +1,22 @@
+[package]
+name = "nix-interop"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.77"
+
+[dependencies]
+anyhow = "1.0.68"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
+serde_repr = "0.1.10"
+syntax = { path = "../syntax" }
+thiserror = "2"
+tokio = { version = "1.27.0", features = ["io-util", "macros", "process", "sync"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "0.38.3", default-features = false, features = ["process", "std"] }
+
+[dev-dependencies]
+tokio = { version = "1.27.0", features = ["macros", "parking_lot", "rt", "sync"] } # parking_lot is required for `OnceCell::const_new`.
+

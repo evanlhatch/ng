@@ -63,10 +63,11 @@ chumsky = "0.9"
 
 toml = "0.8.12" # Added for ng.toml parsing
 
-# Dependencies for Nix analysis and interaction (from the local nil project)
-syntax = { path = "../nil/crates/syntax" }
-ide = { path = "../nil/crates/ide" }
-nix-interop = { path = "../nil/crates/nix-interop" } # Re-enabling for integration
+# Dependencies for Nix analysis and interaction (from the nil project)
+syntax = { path = "vendor/syntax" }
+ide = { path = "vendor/ide" }
+nix-interop = { path = "vendor/nix-interop" }
+builtin = { path = "vendor/builtin" }
 
 [target.'cfg(target_os="macos")'.dependencies]
 system-configuration = "0.6.1"
