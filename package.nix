@@ -30,8 +30,9 @@ rustPlatform.buildRustPackage {
 
   buildInputs = lib.optionals stdenv.isDarwin [ darwin.apple_sdk.frameworks.SystemConfiguration ];
 
-  # Remove the --frozen flag since we won't be using vendored dependencies
+  # Use the --frozen flag to ensure we use vendored dependencies
   cargoBuildFlags = [
+    "--frozen"
   ];
 
   preFixup = ''
@@ -48,8 +49,11 @@ rustPlatform.buildRustPackage {
       --prefix PATH : ${lib.makeBinPath runtimeDeps}
   '';
 
-  # Use a placeholder hash that will be replaced with the correct one
-  cargoSha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  # Tell Nix to use the vendored dependencies
+  cargoVendorDir = ./vendor;
+  
+  # Skip the vendoring phase since we already have the vendor directory
+  dontCargoVendor = true;
 
   env = {
     NG_REV = rev;
