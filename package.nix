@@ -48,13 +48,8 @@ rustPlatform.buildRustPackage {
       --prefix PATH : ${lib.makeBinPath runtimeDeps}
   '';
 
-  # Use Nix's built-in dependency fetching
-  cargoLock = {
-    lockFile = ./Cargo.lock;
-    outputHashes = {
-      # This will be filled in by Nix on the first build attempt
-    };
-  };
+  # Use a placeholder hash that will be replaced with the correct one
+  cargoSha256 = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
   env = {
     NG_REV = rev;
