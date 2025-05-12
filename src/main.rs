@@ -1,6 +1,7 @@
 mod cli; // Assuming your cli module
 
-use cli::{Cli, Commands, FormatArgs}; // Adjust import
+use clap::Parser;
+use cli::{Cli, Commands}; // Removed FormatArgs as it's unused
 use color_eyre::eyre::{Result, WrapErr};
 use std::env;
 use std::path::PathBuf;
