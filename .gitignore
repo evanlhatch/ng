@@ -3,3 +3,15 @@ result*
 target
 report*
 NH_ENHANCEMENT_PLAN.md
+
+# Ignore the entire vendor directory by default
+/vendor/
+
+# But DO NOT ignore our specific local crates within vendor/
+!/vendor/builtin/
+!/vendor/ide/
+!/vendor/syntax/
+!/vendor/nix-interop/
+
+# It's also good practice to ignore the .DS_Store file if users are on macOS
+.DS_Store
