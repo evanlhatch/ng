@@ -94,18 +94,4 @@ rustPlatform.buildRustPackage {
     ];
   };
 
-  # Debugging: List contents of vendor and .cargo
-  preBuild = ''
-    echo "--- Contents of vendor directory (top level):"
-    ls -l vendor || true
-
-    echo "--- Contents of vendor/builtin directory:"
-    ls -l vendor/builtin || true # Check if Cargo.toml is listed here
-
-    echo "--- Contents of .cargo directory:"
-    ls -l .cargo || true
-
-    echo "--- Attempting to cat vendor/builtin/Cargo.toml:"
-    cat vendor/builtin/Cargo.toml || echo "cat vendor/builtin/Cargo.toml FAILED" # Try to display it
-  '';
 }
