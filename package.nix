@@ -61,6 +61,9 @@ rustPlatform.buildRustPackage {
   # Skip the cargo check phase
   dontCargoCheck = true;
   
+  # Tell Nix to use the vendored dependencies
+  cargoVendorDir = ./vendor;
+  
   # Copy the vendor directory and .cargo config to the build directory
   preBuild = ''
     echo "--- Contents of vendor directory (top level):"
