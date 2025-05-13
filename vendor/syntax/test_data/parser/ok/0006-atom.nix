@@ -5,7 +5,7 @@
   /a
   a/a
   ~/a
-  a:a
+  "a:a"
   "fo${bar}o"
   ''fo${bar}o''
   rec { }

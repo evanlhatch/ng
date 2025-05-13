@@ -38,3 +38,15 @@ test-nix: build-nix
     @echo "Testing the Nix build..."
     ./result/bin/ng --version
 
+# Format Nix files in the current directory and subdirectories
+format:
+    @echo "Formatting Nix files in the current directory and subdirectories..."
+    cargo run -- format --apply .
+    @echo "Formatting complete."
+
+# Format Nix files in check-only mode (no changes applied)
+format-check:
+    @echo "Checking Nix file formatting in the current directory and subdirectories..."
+    cargo run -- format .
+    @echo "Format check complete."
+

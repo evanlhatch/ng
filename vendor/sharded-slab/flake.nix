@@ -1,7 +1,6 @@
 # in flake.nix
 {
-  description =
-    "Flake containing a development shell for the `sharded-slab` crate";
+  description = "Flake containing a development shell for the `sharded-slab` crate";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -15,14 +14,27 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
         rustToolchain = pkgs.pkgsBuildHost.rust-bin.stable.latest.default;
-        nativeBuildInputs = with pkgs; [ rustToolchain pkg-config ];
-      in with pkgs; {
+        nativeBuildInputs = with pkgs; [
+          rustToolchain
+          pkg-config
+        ];
+      in
+      with pkgs;
+      {
         devShells.default = mkShell { inherit nativeBuildInputs; };
-      });
+      }
+    );
 }

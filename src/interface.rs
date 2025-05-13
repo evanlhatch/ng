@@ -61,7 +61,7 @@ impl NGCommand {
                 args.run(verbose_count)
             }
             Self::Search(args) => args.run(verbose_count),
-            Self::Clean(proxy) => proxy.command.run(verbose_count),
+            Self::Clean(proxy) => CleanMode::run(&proxy.command, verbose_count),
             Self::Completions(args) => args.run(verbose_count),
             Self::Home(args) => {
                 std::env::set_var("NG_CURRENT_COMMAND", "home");
@@ -256,7 +256,7 @@ pub enum SearchNixpkgsFrom {
 }
 
 // Needed a struct to have multiple sub-subcommands
-#[derive(Debug, Clone, Args)]
+#[derive(Args, Debug, Clone)]
 pub struct CleanProxy {
     #[clap(subcommand)]
     command: CleanMode,
@@ -355,9 +355,7 @@ pub struct HomeRebuildArgs {
     ///
     /// If unspecified, will try <username>@<hostname> and <username>
     #[arg(long, short)]
-    pub configuration: Option<String>,
-
-    /// Explicitly select some specialisation
+    pub configuration: Option<String>,      /// Explicitly select some specialisation
     #[arg(long, short)]
     pub specialisation: Option<String>,
 
@@ -390,7 +388,7 @@ pub struct HomeReplArgs {
     pub extra_args: Vec<String>,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Parser, Debug)]
 /// Generate shell completion files into stdout
 pub struct CompletionArgs {
     /// Name of the shell

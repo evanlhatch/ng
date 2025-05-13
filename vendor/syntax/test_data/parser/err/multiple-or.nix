@@ -1,1 +1,4 @@
-(a or or) [ a or or b ]
+(a) [
+  a
+  b
+]

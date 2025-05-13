@@ -9,20 +9,28 @@
   };
 
   # Include the same packages as in shell.nix
-  packages = with pkgs; [
-    cargo
-    rustc
-    rust-analyzer-unwrapped
-    (rustfmt.override { asNightly = true; })
-    clippy
-    nvd
-    nix-output-monitor
-    taplo
-    yaml-language-server
-  ] ++ (if pkgs.stdenv.isDarwin then [
-    pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-    pkgs.libiconv
-  ] else []);
+  packages =
+    with pkgs;
+    [
+      cargo
+      rustc
+      rust-analyzer-unwrapped
+      (rustfmt.override { asNightly = true; })
+      clippy
+      nvd
+      nix-output-monitor
+      taplo
+      yaml-language-server
+    ]
+    ++ (
+      if pkgs.stdenv.isDarwin then
+        [
+          pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+          pkgs.libiconv
+        ]
+      else
+        [ ]
+    );
 
   enterShell = ''
     echo "Entering nh development environment"
