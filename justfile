@@ -27,3 +27,14 @@ uninstall-user:
     nix profile remove .#ng
     @echo "'ng' CLI uninstall attempted. Use 'nix profile list' and 'nix profile remove <index/attr>' for specifics."
 
+# Build the project using Nix
+build-nix:
+    @echo "Building 'ng' using Nix..."
+    nix build .#ng
+    @echo "Build completed. The result is available in ./result"
+
+# Test the Nix build
+test-nix: build-nix
+    @echo "Testing the Nix build..."
+    ./result/bin/ng --version
+

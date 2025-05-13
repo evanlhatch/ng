@@ -48,6 +48,7 @@ pub enum NGCommand {
     Darwin(DarwinArgs),
     Search(SearchArgs),
     Clean(CleanProxy),
+    Format(FormatArgs), // Added Format command
     #[command(hide = true)]
     Completions(CompletionArgs),
 }
@@ -69,6 +70,10 @@ impl NGCommand {
             Self::Darwin(args) => {
                 std::env::set_var("NG_CURRENT_COMMAND", "darwin");
                 args.run(verbose_count)
+            }
+            Self::Format(args) => { // Arm for Format
+                // Call the formatting logic from the new module
+                crate::format_logic::run_formatting(&args, verbose_count)
             }
         }
     }
@@ -447,4 +452,17 @@ pub struct UpdateArgs {
     #[arg(short = 'U', long = "update-input")]
     /// Update a single flake input
     pub update_input: Option<String>,
+}
+
+// Added from cli.rs
+#[derive(Debug, Args)]
+/// Format Nix files in the current directory and subdirectories.
+pub struct FormatArgs {
+    /// Whether to apply the formatting changes (default: check only).
+    #[clap(long, short, action)]
+    pub apply: bool,
+
+    /// The path to start formatting from (defaults to the current directory)
+    #[clap(default_value = ".")]
+    pub path: String,
 }

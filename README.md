@@ -82,6 +82,32 @@ cargo build
 cargo run -- --help
 ```
 
+## Building with Nix
+
+This project uses [Crane](https://github.com/ipetkov/crane) to build the Rust project with Nix. The build process is configured to properly handle the local path dependencies in the `vendor` directory.
+
+To build the project:
+
+```sh
+# Using nix build
+nix build .#ng
+
+# Using just
+just build-nix
+```
+
+The build result will be available in the `./result` directory.
+
+You can install the built package to your user profile:
+
+```sh
+# Using nix profile
+nix profile install .#ng
+
+# Using just
+just install-user
+```
+
 ## License
 
 Licensed under the [EUPL-1.2](LICENSE).

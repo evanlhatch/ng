@@ -6,6 +6,7 @@ pub mod progress;
 pub mod ui_style;
 pub mod tables;
 pub mod util;
+pub mod format_logic; // Added for formatting command
 
 // Workflow refactoring modules
 pub mod workflow_types;

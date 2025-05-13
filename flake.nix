@@ -16,24 +16,58 @@
           overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs { inherit system overlays; };
           rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-          craneLib = crane.mkLib pkgs;
-          projectSrc = craneLib.cleanCargoSource (craneLib.path ./.);
-          commonSystemDeps = with pkgs; [
+          craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
+          
+          # Create a source filter that includes the vendor directory
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter = path: type:
+              (pkgs.lib.hasInfix "/vendor/" path) ||
+              (craneLib.filterCargoSources path type);
+          };
+          
+          # Common dependencies
+          commonDeps = with pkgs; [
             openssl pkg-config gtk3 glib cairo pango gdk-pixbuf
+            # Add nix for the builtin crate's build script
+            nix
           ];
+          
+          # Build dependencies only (this will be cached)
           cargoArtifacts = craneLib.buildDepsOnly {
-            src = projectSrc;
-            cargoVendorDir = pkgs.lib.mkForce null;
-            nativeBuildInputs = commonSystemDeps;
+            inherit src;
+            
+            # Tell crane to use the vendored dependencies
+            cargoExtraArgs = "--offline";
+            
+            # Provide build inputs
+            nativeBuildInputs = commonDeps;
+            buildInputs = commonDeps;
           };
-          commonCrateArgs = {
-            inherit cargoArtifacts projectSrc;
-            strictDeps = true;
-            nativeBuildInputs = commonSystemDeps;
-            buildInputs = commonSystemDeps;
+          
+          # Build the actual package
+          ng-cli = craneLib.buildPackage {
+            inherit src cargoArtifacts;
+            
+            # Tell crane to use the vendored dependencies
+            cargoExtraArgs = "--offline";
+            
+            # Provide build inputs
+            nativeBuildInputs = commonDeps;
+            buildInputs = commonDeps;
           };
-          ng-cli = craneLib.buildPackage (commonCrateArgs // { pname = "ng"; });
-          ng-gui = craneLib.buildPackage (commonCrateArgs // { pname = "ng"; cargoExtraArgs = "--bin ng-gui"; });
+          
+          # Build the GUI version
+          ng-gui = craneLib.buildPackage {
+            inherit src cargoArtifacts;
+            
+            # Tell crane to use the vendored dependencies and build the GUI
+            cargoExtraArgs = "--offline --bin ng-gui";
+            
+            # Provide build inputs
+            nativeBuildInputs = commonDeps;
+            buildInputs = commonDeps;
+          };
         in {
           packages = { default = ng-cli; ng = ng-cli; "ng-cli" = ng-cli; "ng-gui" = ng-gui; };
           devShells = {
@@ -54,8 +88,14 @@
           formatter = pkgs.nixfmt-rfc-style;
         };
     in {
-      packages = nixpkgs.lib.mapAttrs (sn: so: so.packages) perSystemOutputs;
-      devShells = nixpkgs.lib.mapAttrs (sn: so: so.devShells) perSystemOutputs;
-      formatter = nixpkgs.lib.mapAttrs (sn: so: so.formatter) perSystemOutputs;
+      packages = nixpkgs.lib.genAttrs supportedSystems (system:
+        let result = perSystemOutputs system; in result.packages
+      );
+      devShells = nixpkgs.lib.genAttrs supportedSystems (system:
+        let result = perSystemOutputs system; in result.devShells
+      );
+      formatter = nixpkgs.lib.genAttrs supportedSystems (system:
+        let result = perSystemOutputs system; in result.formatter
+      );
     };
 }

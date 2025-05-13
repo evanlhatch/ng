@@ -87,14 +87,14 @@ mod tests {
             panic!("Failed to parse OS build --dry args: {:#?}\nArgs: {:?}", e, args_vec)
         });
 
-        if let NHCommand::Os(os_args) = &cli.command {
+        if let NGCommand::Os(os_args) = &cli.command {
             if let OsSubcommand::Build(build_cmd_args) = &os_args.subcommand {
                 assert!(build_cmd_args.common.common.dry, "Expected --dry flag to be true in BuildArgs.common.common");
             } else {
                 panic!("Expected OsSubcommand::Build for this test case.");
             }
         } else {
-            panic!("Expected NHCommand::Os subcommand after parsing arguments.");
+            panic!("Expected NGCommand::Os subcommand after parsing arguments.");
         }
 
         let run_result = cli.command.run(cli.verbose);
@@ -142,7 +142,7 @@ mod tests {
             Err(e) => panic!("Failed to parse args: {}\nError:\n{}", args_vec.join(" "), e.render()),
         };
 
-        if let NHCommand::Os(os_args) = &cli.command {
+        if let NGCommand::Os(os_args) = &cli.command {
             if let OsSubcommand::Boot(boot_args) = &os_args.subcommand {
                 assert!(
                     boot_args.common.common.dry,
@@ -152,7 +152,7 @@ mod tests {
                 panic!("Expected OsSubcommand::Boot for this test case.");
             }
         } else {
-            panic!("Expected NHCommand::Os subcommand after parsing arguments.");
+            panic!("Expected NGCommand::Os subcommand after parsing arguments.");
         }
 
         let run_result = cli.command.run(cli.verbose);

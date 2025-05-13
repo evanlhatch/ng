@@ -94,7 +94,7 @@ mod tests {
         let args = vec!["nh", "search", "--json", "--platforms", "testQuery"];
         let cli = Main::try_parse_from(args).unwrap();
 
-        if let NHCommand::Search(search_args) = cli.command {
+        if let NGCommand::Search(search_args) = cli.command {
             assert!(search_args.json);
             assert!(search_args.platforms);
             assert_eq!(search_args.query, vec!["testQuery"]);
@@ -116,10 +116,10 @@ mod tests {
         let cli_result = Main::try_parse_from(args);
         assert!(cli_result.is_ok(), "Parsing 'nh search' without query should succeed");
         let cli = cli_result.unwrap();
-        if let NHCommand::Search(search_args) = cli.command {
+        if let NGCommand::Search(search_args) = cli.command {
             assert!(search_args.query.is_empty(), "Expected query vector to be empty");
         } else {
-            panic!("Expected NHCommand::Search after parsing 'nh search'");
+            panic!("Expected NGCommand::Search after parsing 'nh search'");
         }
         // Note: The actual error for a missing query would now need to be handled
         // in the SearchArgs::run() method.

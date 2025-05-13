@@ -1,57 +1,59 @@
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    crane = {
-      url = "github:Xe Gravel/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-      };
+{ pkgs ? import <nixpkgs> { }
+, rev ? "dirty"
+, craneLib ? pkgs.crane.lib
+}:
 
+let
+  # Get the Rust toolchain
+  rustToolchain = pkgs.rust-bin.stable.latest.default;
+  craneLibWithToolchain = craneLib.overrideToolchain rustToolchain;
+  
+  # Create a source filter that includes the vendor directory
+  src = pkgs.lib.cleanSourceWith {
+    src = ./.;
+    filter = path: type:
+      (pkgs.lib.hasInfix "/vendor/" path) ||
+      (craneLibWithToolchain.filterCargoSources path type);
   };
-
-  outputs =
-    {
-      self,
-      nixpkgs,
-      crane,
-       rust-overlay,
-    }:
-    let
-      inherit (nixpkgs) system;
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [ rust-overlay.overlay ];
-      };
-      rustToolchain = pkgs.rust-bin.stable.latest.default;
-      craneLib = crane.mkLib pkgs; # IMPORTANT CHANGE
-
-      forAllSystems =
-        function:
-        nixpkgs.lib.genAttrs [
-          "x86_64-linux"
-          "aarch64-linux"
-          # experimental
-          "x86_64-darwin"
-          "aarch64-darwin"
-        ] (system: function nixpkgs.legacyPackages.${system});
-
-      rev = self.shortRev or self.dirtyShortRev or "dirty";
-    in
-    {
-      overlays.default = final: prev: { ng = final.callPackage ./package.nix { inherit rev craneLib; }; };
-
-      packages = forAllSystems (pkgs: rec {
-        ng = pkgs.callPackage ./package.nix { inherit rev craneLib; };
-        default = ng;
-      });
-
-      devShells = forAllSystems (pkgs: {
-        default = import ./shell.nix { inherit pkgs rustToolchain; };
-      });
-
-      formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
-    };
+  
+  # Common dependencies
+  commonDeps = with pkgs; [
+    openssl pkg-config gtk3 glib cairo pango gdk-pixbuf
+    # Add nix for the builtin crate's build script
+    nix
+  ];
+  
+  # Build dependencies only (this will be cached)
+  cargoArtifacts = craneLibWithToolchain.buildDepsOnly {
+    inherit src;
+    
+    # Tell crane to use the vendored dependencies
+    cargoExtraArgs = "--offline";
+    
+    # Provide build inputs
+    nativeBuildInputs = commonDeps;
+    buildInputs = commonDeps;
+  };
+in
+craneLibWithToolchain.buildPackage {
+  inherit src cargoArtifacts;
+  
+  # Tell crane to use the vendored dependencies
+  cargoExtraArgs = "--offline";
+  
+  # Provide build inputs
+  nativeBuildInputs = commonDeps;
+  buildInputs = commonDeps;
+  
+  # Package metadata
+  pname = "ng";
+  version = "4.0.2";
+  
+  meta = with pkgs.lib; {
+    description = "Nix Generator (ng) - A command-line tool for Nix project development";
+    homepage = "https://github.com/nix-community/ng";
+    license = licenses.eupl12;
+    platforms = platforms.all;
+    maintainers = with maintainers; [ ];
+  };
 }
